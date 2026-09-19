@@ -58,3 +58,7 @@
 @media (max-width:860px){
   .identity-text{ display:none; }
 }
+
+/* The sidebar footer names the firm whose desk this is, above the reporting
+   basis — the brand block above it is the product, not the licensee. */
+.sidebar-org{ font-weight:600; color:var(--ink); margin-bottom:2px; }

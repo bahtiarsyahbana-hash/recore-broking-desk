@@ -4,6 +4,7 @@
  * The cedant's own side of the technical account: what was ceded, what
  * commission was earned, what has been recovered on claims.
  */
+import { BROKING_FIRM } from "../../core/config.js";
 import { mount, row } from "../../core/dom.js";
 import { fmtFull } from "../../core/format.js";
 import { programsForCedant, currentCedant } from "../../core/store.js";
@@ -29,7 +30,7 @@ export const cedantStatementView = {
 
   render: () => `<section class="view">
     <div class="view-head">
-      <div><h1>Account Statement</h1><p>Your treaty account with Meridian Bridge Re Brokers, current underwriting year.</p></div>
+      <div><h1>Account Statement</h1><p>Your treaty account with ${BROKING_FIRM}, current underwriting year.</p></div>
     </div>
     <div class="card" style="max-width:560px;">
       <div class="calc-out" id="c-statement-out"></div>

@@ -10,7 +10,7 @@ import { $, $$, mount } from "./dom.js";
 import { state, currentUser, currentPortal } from "./store.js";
 import { emit, TOPICS } from "./events.js";
 import { roleChrome, ROLES } from "./navigation.js";
-import { UNDERWRITING_YEAR, BASE_CURRENCY } from "./config.js";
+import { UNDERWRITING_YEAR, BASE_CURRENCY, BROKING_FIRM } from "./config.js";
 
 const views = new Map();
 let currentView = null;
@@ -77,9 +77,9 @@ export function openWorkspace() {
   $("#identity-name").textContent = user.name;
   $("#identity-title").textContent = user.title;
   $("#avatar").textContent = user.initials;
-  $("#sidebar-foot").textContent = isCedant
-    ? `${user.cedant} · read-only`
-    : chrome.footer;
+  // Whose desk this is, above the reporting basis.
+  $("#sidebar-org").textContent = isCedant ? user.cedant : BROKING_FIRM;
+  $("#sidebar-foot").textContent = isCedant ? "Read-only portal" : chrome.footer;
 
   emit(TOPICS.ROLE, portal);
   showView(chrome.landing);

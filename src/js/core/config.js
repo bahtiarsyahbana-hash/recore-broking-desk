@@ -36,6 +36,9 @@ export const CHART_COLORS = ["#0a369d", "#001233", "#4a73c8", "#8a93a5"];
  */
 export const TOWER_COLORS = ["#001233", "#0a369d", "#2e5ac4", "#5b82db", "#93aee9"];
 
+/** The broking firm running this desk — the licensee, not the product. */
+export const BROKING_FIRM = "Meridian Bridge Re Brokers";
+
 /** The cedant whose book the optional portal exposes. */
 export const PORTAL_CEDANT = "Meridian Mutual Insurance";
 
