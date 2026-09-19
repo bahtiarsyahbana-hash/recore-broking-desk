@@ -35,6 +35,24 @@ filesystem will not work.
 Override the port with `PORT=8080 npm run dev`. Any other static server rooted at
 `src/` does the job equally well, e.g. `npx serve src`.
 
+## Deploying
+
+The app is static — `src/` is the whole site, with no build step. `vercel.json`
+points Vercel at it:
+
+```json
+{ "framework": null, "outputDirectory": "src" }
+```
+
+Nothing is compiled, so `npm install` and a build command are both unnecessary.
+Any static host works the same way: serve `src/` at the root.
+
+**Before deploying anywhere public, read this.** The sign-in is not
+authentication — every password is printed on the screen, so a deployment is
+readable by anyone who has the URL. `src/robots.txt` keeps it out of search
+results, but that is a courtesy, not a control. If the deployment should not be
+public, put Vercel's Deployment Protection in front of it.
+
 ## Layout
 
 ```

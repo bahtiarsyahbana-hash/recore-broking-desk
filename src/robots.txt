@@ -1,0 +1,4 @@
+# Prototype with demonstration data — not a production system.
+# Kept out of search results so it is not mistaken for a live broking platform.
+User-agent: *
+Disallow: /
