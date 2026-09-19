@@ -1,0 +1,8 @@
+/* Buttons — primary, ghost, disabled. */
+.btn{ display:inline-flex; align-items:center; gap:7px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); padding:9px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+.btn:hover{ background:var(--surface-2); }
+.btn.primary{ background:var(--marine); border-color:var(--marine); color:#fff; }
+.btn.primary:hover{ filter:brightness(1.08); }
+.btn.ghost{ background:none; border-color:transparent; }
+.btn:disabled{ opacity:.45; cursor:not-allowed; }
+.btn svg{ width:15px; height:15px; }

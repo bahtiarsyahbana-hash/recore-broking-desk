@@ -1,0 +1,15 @@
+/* Modal shell — wizard and program lifecycle drawer. */
+.modal-backdrop{ position:fixed; inset:0; background:rgba(10,14,24,.5); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; }
+.modal{ background:var(--surface); border-radius:14px; width:100%; max-width:620px; max-height:88vh; overflow-y:auto; box-shadow:0 30px 60px -15px rgba(0,0,0,.4); }
+.modal-head{ padding:18px 22px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+.modal-body{ padding:20px 22px; }
+.modal-foot{ padding:16px 22px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+.step-dots{ display:flex; gap:6px; }
+.step-dots span{ width:7px; height:7px; border-radius:50%; background:var(--line); }
+.step-dots span.active{ background:var(--marine); }
+.close-x{ background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:18px; line-height:1; padding:4px; }
+
+.market-row{ display:flex; align-items:center; gap:10px; padding:9px 6px; border-bottom:1px solid var(--line-soft); }
+.market-row .m-name{ flex:1; font-weight:600; font-size:13px; }
+.market-row .m-rating{ font-size:11px; color:var(--ink-soft); }
+.market-row input[type=number]{ width:74px; text-align:right; }

@@ -1,0 +1,1513 @@
+<title>ReCore Broking Desk</title>
+<meta name="description" content="Interactive prototype of a reinsurance broker core system — facultative and treaty placement, quota share, surplus and excess-of-loss calculators, bordereaux, claims and accounting, plus an optional cedant portal.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ink:#10192b; --ink-soft:#3a4457;
+    --bg:#ffffff; --surface:#ffffff; --surface-2:#f3f4f6;
+    --line:rgba(16,25,43,.12); --line-soft:rgba(16,25,43,.07);
+    --marine:#1f6f78; --marine-ink:#123f45; --marine-tint:#e2eeee;
+    --brass:#a97a2f; --brass-tint:#f3e6cd;
+    --good:#1e7a4c; --good-tint:#e2f1e7;
+    --warn:#b1701c; --warn-tint:#f7ecd8;
+    --bad:#a83a3a; --bad-tint:#f6e3e1;
+    --info:#3a5f8a; --info-tint:#e5ecf5;
+    --shadow: 0 1px 2px rgba(16,25,43,.05), 0 6px 20px -10px rgba(16,25,43,.14);
+    --radius: 10px;
+    color-scheme: light;
+  }
+  /* Bright/white theme is the fixed default for presentation and daily-use consistency —
+     it no longer follows the OS's prefers-color-scheme. The dark palette below stays
+     available behind an explicit data-theme="dark" attribute if a manual toggle is added later. */
+  :root[data-theme="dark"]{
+    --ink:#e9e6db; --ink-soft:#aab1c2;
+    --bg:#0c1220; --surface:#131b2c; --surface-2:#1a2338;
+    --line:rgba(233,230,219,.14); --line-soft:rgba(233,230,219,.08);
+    --marine:#4fb3ba; --marine-ink:#bfe7e9; --marine-tint:#12313a;
+    --brass:#d9a354; --brass-tint:#332510;
+    --good:#4fbf82; --good-tint:#123522;
+    --warn:#e0a13f; --warn-tint:#3a2b10;
+    --bad:#e2827c; --bad-tint:#3a1c1c;
+    --info:#8fb0d8; --info-tint:#1a2740;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -10px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  [hidden]{ display:none !important; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{ font-family:'Fraunces',Georgia,serif; text-wrap:balance; margin:0; }
+  .mono, .num, input[type=number], input[type=text].mono, td.num, .kpi-value{ font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  a{ color:var(--marine); }
+  button{ font-family:inherit; }
+  ::selection{ background:var(--marine); color:#fff; }
+
+  .app{ display:grid; grid-template-columns:236px 1fr; min-height:100vh; }
+  .brand{ display:flex; align-items:center; gap:10px; padding:18px 20px 14px; border-bottom:1px solid var(--line); }
+  .brand .mark{ width:30px; height:30px; border-radius:8px; background:linear-gradient(155deg,var(--marine),var(--marine-ink)); display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Fraunces',serif; font-weight:600; font-size:16px; flex:none; }
+  .brand .name{ font-family:'Fraunces',serif; font-weight:600; font-size:17px; }
+  .brand .sub{ font-size:11px; color:var(--ink-soft); letter-spacing:.04em; text-transform:uppercase; }
+
+  .sidebar{ background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto; }
+  .nav{ padding:10px; display:flex; flex-direction:column; gap:2px; flex:1; }
+  .nav-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); padding:14px 10px 6px; }
+  .nav-item{ display:flex; align-items:center; gap:11px; padding:9px 10px; border-radius:8px; color:var(--ink-soft); text-decoration:none; cursor:pointer; border:none; background:none; width:100%; text-align:left; font-size:13.5px; font-weight:500; }
+  .nav-item svg{ width:17px; height:17px; flex:none; opacity:.85; }
+  .nav-item:hover{ background:var(--surface-2); color:var(--ink); }
+  .nav-item.active{ background:var(--marine-tint); color:var(--marine-ink); }
+  .nav-item.active svg{ opacity:1; }
+  .sidebar-foot{ padding:12px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-soft); }
+
+  .main{ min-width:0; }
+  .topbar{ position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .roleswitch{ display:flex; background:var(--surface-2); border-radius:999px; padding:3px; gap:2px; }
+  .roleswitch button{ border:none; background:none; padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
+  .roleswitch button.active{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+  .topbar .spacer{ flex:1; }
+  .chip{ display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:var(--surface-2); font-size:12px; color:var(--ink-soft); }
+  .chip.cedant-flag{ background:var(--brass-tint); color:var(--brass); font-weight:600; }
+  .avatar{ width:28px; height:28px; border-radius:50%; background:var(--marine); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+
+  .view{ padding:22px 24px 60px; max-width:1240px; }
+  .view-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:18px; flex-wrap:wrap; }
+  .view-head h1{ font-size:23px; font-weight:600; }
+  .view-head p{ margin:4px 0 0; color:var(--ink-soft); font-size:13px; max-width:56ch; }
+
+  .btn{ display:inline-flex; align-items:center; gap:7px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); padding:9px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn:hover{ background:var(--surface-2); }
+  .btn.primary{ background:var(--marine); border-color:var(--marine); color:#fff; }
+  .btn.primary:hover{ filter:brightness(1.08); }
+  .btn.ghost{ background:none; border-color:transparent; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn svg{ width:15px; height:15px; }
+
+  .grid-kpi{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow); }
+  .kpi-label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
+  .kpi-value{ font-size:24px; font-weight:600; margin-top:6px; }
+  .kpi-delta{ font-size:12px; margin-top:4px; display:flex; align-items:center; gap:4px; }
+  .kpi-delta.up{ color:var(--good); } .kpi-delta.down{ color:var(--bad); }
+
+  .cols-2{ display:grid; grid-template-columns:1.4fr 1fr; gap:16px; align-items:start; }
+  .cols-registry{ display:grid; grid-template-columns:repeat(auto-fit, minmax(320px,1fr)); gap:16px; align-items:start; }
+  .panel-title{ font-size:13.5px; font-weight:700; margin-bottom:2px; }
+  .panel-title .count{ font-weight:500; color:var(--ink-soft); font-size:12px; }
+  .panel-sub{ font-size:12px; color:var(--ink-soft); margin-bottom:12px; }
+  .reg-badge{ display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.3px; padding:2px 7px; border-radius:20px; background:var(--surface-2); color:var(--ink-soft); }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  thead th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  tbody td{ padding:10px 10px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+  tbody tr:hover{ background:var(--surface-2); }
+  td.num, th.num{ text-align:right; }
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow); }
+  .table-wrap table{ min-width:640px; }
+  .table-wrap.compact table{ min-width:0; width:100%; }
+  .table-wrap.compact th, .table-wrap.compact td{ white-space:nowrap; }
+  .reg-list{ border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow); overflow:hidden; }
+  .reg-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); }
+  .reg-row:last-child{ border-bottom:none; }
+  .reg-main{ flex:1; min-width:0; }
+  .reg-name{ font-weight:600; font-size:13px; }
+  .reg-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .reg-side{ flex-shrink:0; text-align:right; }
+
+  .pill{ display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+  .pill.good{ background:var(--good-tint); color:var(--good); }
+  .pill.warn{ background:var(--warn-tint); color:var(--warn); }
+  .pill.bad{ background:var(--bad-tint); color:var(--bad); }
+  .pill.info{ background:var(--info-tint); color:var(--info); }
+  .pill.neutral{ background:var(--surface-2); color:var(--ink-soft); }
+  .pill::before{ content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .type-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.02em; }
+  .type-badge.fac{ background:var(--info-tint); color:var(--info); }
+  .type-badge.qs{ background:var(--marine-tint); color:var(--marine-ink); }
+  .type-badge.surplus{ background:var(--brass-tint); color:var(--brass); }
+  .type-badge.xol{ background:var(--warn-tint); color:var(--warn); }
+
+  .toolbar{ display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .seg{ display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg button{ border:none; background:var(--surface); padding:7px 12px; font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; border-right:1px solid var(--line); }
+  .seg button:last-child{ border-right:none; }
+  .seg button.active{ background:var(--marine); color:#fff; }
+  input[type=text],input[type=number],select,textarea{
+    font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:8px 10px; border-radius:7px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink); width:100%;
+  }
+  input[type=number]{ font-family:'IBM Plex Mono',monospace; }
+  label{ font-size:12px; font-weight:600; color:var(--ink-soft); display:block; margin-bottom:4px; }
+  .field{ margin-bottom:12px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .field-row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .hint{ font-size:11.5px; color:var(--ink-soft); margin-top:3px; }
+
+  .calc-out{ background:var(--surface-2); border-radius:8px; padding:14px 16px; }
+  .calc-out .row{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+  .calc-out .row:last-child{ border-bottom:none; padding-top:10px; margin-top:2px; border-top:1px solid var(--line); font-weight:700; }
+  .calc-out .row span:last-child{ font-family:'IBM Plex Mono',monospace; }
+
+  .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:18px; }
+  .tab{ padding:9px 4px; margin-right:18px; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab.active{ color:var(--marine-ink); border-color:var(--marine); }
+
+  .layer-row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:8px; align-items:end; margin-bottom:10px; }
+  .tower{ display:flex; flex-direction:column-reverse; gap:2px; }
+  .tower .layer{ border-radius:6px; padding:8px 12px; color:#fff; font-size:12px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .tower .retention{ background:repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 6px, var(--line) 6px, var(--line) 12px); color:var(--ink-soft); border-radius:6px; padding:6px 12px; font-size:11.5px; text-align:center; }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(10,14,24,.5); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; }
+  .modal{ background:var(--surface); border-radius:14px; width:100%; max-width:620px; max-height:88vh; overflow-y:auto; box-shadow:0 30px 60px -15px rgba(0,0,0,.4); }
+  .modal-head{ padding:18px 22px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  .modal-body{ padding:20px 22px; }
+  .modal-foot{ padding:16px 22px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  .step-dots{ display:flex; gap:6px; }
+  .step-dots span{ width:7px; height:7px; border-radius:50%; background:var(--line); }
+  .step-dots span.active{ background:var(--marine); }
+  .close-x{ background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:18px; line-height:1; padding:4px; }
+
+  .market-row{ display:flex; align-items:center; gap:10px; padding:9px 6px; border-bottom:1px solid var(--line-soft); }
+  .market-row .m-name{ flex:1; font-weight:600; font-size:13px; }
+  .market-row .m-rating{ font-size:11px; color:var(--ink-soft); }
+  .market-row input[type=number]{ width:74px; text-align:right; }
+
+  .banner{ display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:8px; background:var(--info-tint); color:var(--info); font-size:12.5px; margin-bottom:18px; }
+  .banner.brass{ background:var(--brass-tint); color:var(--brass); }
+  .banner.warn{ background:var(--warn-tint); color:var(--warn); }
+  .banner svg{ width:16px; height:16px; flex:none; margin-top:1px; }
+
+  .stepper{ display:flex; margin-bottom:18px; }
+  .stepper .step{ flex:1; text-align:center; font-size:10.5px; color:var(--ink-soft); padding-bottom:10px; position:relative; }
+  .stepper .step::after{ content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:var(--line); border-radius:2px; }
+  .stepper .step.done::after{ background:var(--good); }
+  .stepper .step.current{ color:var(--ink); font-weight:700; }
+  .stepper .step.current::after{ background:var(--marine); }
+  .confirm-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line-soft); font-size:13px; }
+  .doc-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line-soft); font-size:12.5px; background:var(--surface-2); border-radius:6px; margin-bottom:6px; }
+  .doc-row .d-name{ font-weight:600; }
+  .doc-row .d-meta{ color:var(--ink-soft); font-size:11.5px; }
+  .fin-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; }
+  .fin-badge.Invoice{ background:var(--info-tint); color:var(--info); }
+  .fin-badge.Credit-Note{ background:var(--good-tint); color:var(--good); }
+  .fin-badge.Debit-Note{ background:var(--warn-tint); color:var(--warn); }
+
+  .empty{ text-align:center; padding:40px 20px; color:var(--ink-soft); }
+
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-soft); margin-top:8px; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend i{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+
+  @media (max-width:860px){
+    .app{ grid-template-columns:1fr; }
+    .sidebar{ position:static; height:auto; flex-direction:row; overflow-x:auto; }
+    .brand{ display:none; }
+    .nav{ flex-direction:row; padding:8px; }
+    .nav-label{ display:none; }
+    .nav-item{ white-space:nowrap; }
+    .sidebar-foot{ display:none; }
+    .grid-kpi{ grid-template-columns:1fr 1fr; }
+    .cols-2{ grid-template-columns:1fr; }
+    .field-row,.field-row3{ grid-template-columns:1fr; }
+    .view{ padding:16px 16px 50px; }
+  }
+</style>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">R</div>
+      <div>
+        <div class="name">ReCore</div>
+        <div class="sub">Meridian Bridge Re Brokers</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav-broker">
+      <div class="nav-label">Broker Desk</div>
+      <button class="nav-item active" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>Dashboard</button>
+      <button class="nav-item" data-view="placements"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3.5h9l3.5 3.5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z"/><path d="M8.5 12h7M8.5 15.5h7M8.5 8.5h4"/></svg>Placements</button>
+      <button class="nav-item" data-view="treaty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8 12 4l8 4-8 4-8-4Z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/></svg>Treaty Engine</button>
+      <button class="nav-item" data-view="bordereaux"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M8.5 9.5V20"/></svg>Bordereaux</button>
+      <button class="nav-item" data-view="claims"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.5 4.5 6.5v5.4c0 4.5 3.1 7.3 7.5 8.6 4.4-1.3 7.5-4.1 7.5-8.6V6.5L12 3.5Z"/><path d="M12 8.5v4M12 15.2h.01"/></svg>Claims</button>
+      <button class="nav-item" data-view="accounting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4.5" y="3.5" width="15" height="17" rx="1.5"/><path d="M8 8h8M8 11.5h8M8 15h5"/></svg>Accounting</button>
+      <button class="nav-item" data-view="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 20V10M12 20V4.5M19.5 20v-7"/></svg>Reports</button>
+      <div class="nav-label">Registry</div>
+      <button class="nav-item" data-view="registry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M4.5 20c0-3.6 3.4-6 7.5-6s7.5 2.4 7.5 6"/></svg>Registry</button>
+    </nav>
+    <nav class="nav" id="nav-cedant" hidden>
+      <div class="nav-label">Cedant Portal · Meridian Mutual</div>
+      <button class="nav-item active" data-view="c-programs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 7.5h6l1.6 2h9.4v10.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V7.5Z"/></svg>My Programs</button>
+      <button class="nav-item" data-view="c-submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg>Submit a Risk</button>
+      <button class="nav-item" data-view="c-bdx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 15.5V4.5M8 8.5 12 4.5 16 8.5"/><path d="M4.5 15.5v3a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-3"/></svg>Upload Bordereau</button>
+      <button class="nav-item" data-view="c-statement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3.5" width="14" height="17" rx="1.5"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4"/></svg>Account Statement</button>
+    </nav>
+    <div class="sidebar-foot" id="sidebar-foot">Underwriting year 2026 · USD reporting</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="roleswitch">
+        <button id="role-broker" class="active">Broker Desk</button>
+        <button id="role-cedant">Cedant Portal</button>
+      </div>
+      <span class="chip" id="cedant-flag-chip" hidden>optional module · limited access</span>
+      <div class="spacer"></div>
+      <span class="chip">FY2026</span>
+      <span class="chip">Base ccy USD</span>
+      <div class="avatar" id="avatar">VR</div>
+    </header>
+
+    <!-- ================= BROKER: DASHBOARD ================= -->
+    <section class="view" id="view-dashboard">
+      <div class="view-head">
+        <div>
+          <h1>Broking Desk</h1>
+          <p>Every program the desk is running this underwriting year — facultative and treaty, proportional and non‑proportional, in one book.</p>
+        </div>
+        <button class="btn primary" onclick="openWizard()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          New Submission
+        </button>
+      </div>
+
+      <div class="grid-kpi" id="kpi-row"></div>
+
+      <div class="card" id="renewals-card" style="margin-bottom:16px;">
+        <div class="panel-title">Renewals due in 60 days</div>
+        <div class="panel-sub">The lifecycle loops itself — each one re-opens at Issue Slip, pre-populated from the expiring terms</div>
+        <div id="renewals-list"></div>
+      </div>
+
+      <div class="cols-2">
+        <div class="card">
+          <div class="panel-title">Bound premium by class of business</div>
+          <div class="panel-sub">Gross premium, USD equivalent, current underwriting year</div>
+          <div id="chart-bar"></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Loss ratio trend</div>
+          <div class="panel-sub">Incurred / earned, trailing quarters</div>
+          <div id="chart-line"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="panel-title">Recent activity</div>
+        <div class="panel-sub">Straight-through from placement, bordereaux and claims</div>
+        <div id="activity-feed"></div>
+      </div>
+    </section>
+
+    <!-- ================= BROKER: PLACEMENTS ================= -->
+    <section class="view" id="view-placements" hidden>
+      <div class="view-head">
+        <div>
+          <h1>Placements</h1>
+          <p>Facultative risks and treaty programs — one workflow, one signing engine, filtered any way you like.</p>
+        </div>
+        <button class="btn primary" onclick="openWizard()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          New Submission
+        </button>
+      </div>
+      <div class="toolbar">
+        <div class="seg" id="placement-filter">
+          <button class="active" data-f="all">All</button>
+          <button data-f="Facultative">Facultative</button>
+          <button data-f="Quota Share">Quota Share</button>
+          <button data-f="Surplus">Surplus</button>
+          <button data-f="Excess of Loss">Excess of Loss</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Program</th><th>Cedant</th><th>Class</th><th>Type</th><th>Structure</th><th class="num">Gross Premium</th><th>Status</th><th></th></tr></thead>
+          <tbody id="placements-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= BROKER: TREATY ENGINE ================= -->
+    <section class="view" id="view-treaty" hidden>
+      <div class="view-head">
+        <div>
+          <h1>Treaty Calculation Engine</h1>
+          <p>The same audited formulas that post to every technical account — try terms before they go on a slip.</p>
+        </div>
+      </div>
+      <div class="tabs" id="treaty-tabs">
+        <div class="tab active" data-t="qs">Quota Share</div>
+        <div class="tab" data-t="surplus">Surplus</div>
+        <div class="tab" data-t="xol">Excess of Loss</div>
+      </div>
+
+      <div id="treaty-qs">
+        <div class="cols-2">
+          <div class="card">
+            <div class="panel-title">Quota share terms</div>
+            <div class="panel-sub">Cedant: Pacífico General Insurance · Property QS · UWY 2026</div>
+            <div class="field-row">
+              <div class="field"><label>Gross Net Premium Income</label><input type="number" id="qs-gnpi" value="18400000" step="10000"></div>
+              <div class="field"><label>Cession %</label><input type="number" id="qs-cession" value="35" step="0.5"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Ceding commission %</label><input type="number" id="qs-comm" value="28" step="0.5"></div>
+              <div class="field"><label>Brokerage %</label><input type="number" id="qs-brok" value="2.5" step="0.25"></div>
+            </div>
+            <div class="hint">Sliding-scale commission and profit commission are configured per treaty; this quick engine uses the flat rate above.</div>
+          </div>
+          <div class="card">
+            <div class="panel-title">Result</div>
+            <div class="panel-sub">Recomputes live as terms change</div>
+            <div class="calc-out" id="qs-out"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="treaty-surplus" hidden>
+        <div class="cols-2">
+          <div class="card">
+            <div class="panel-title">Surplus treaty terms</div>
+            <div class="panel-sub">Cedant: Northwind Assurance Co. · Motor Surplus · UWY 2026</div>
+            <div class="field-row">
+              <div class="field"><label>Risk sum insured</label><input type="number" id="sp-si" value="4500000" step="50000"></div>
+              <div class="field"><label>Cedant retention (line)</label><input type="number" id="sp-ret" value="500000" step="10000"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Treaty lines (max multiple)</label><input type="number" id="sp-lines" value="9" step="1"></div>
+              <div class="field"><label>Gross premium for this risk</label><input type="number" id="sp-prem" value="62000" step="500"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="panel-title">Result</div>
+            <div class="panel-sub">Cession % varies by risk size, capped at treaty lines</div>
+            <div class="calc-out" id="sp-out"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="treaty-xol" hidden>
+        <div class="cols-2">
+          <div class="card">
+            <div class="panel-title">Layer tower — Meridian Mutual Property XL</div>
+            <div class="panel-sub">Build the tower layer by layer; rate on line is calculated per layer</div>
+            <div id="layer-rows"></div>
+            <button class="btn ghost" onclick="addLayer()" style="margin-top:4px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Add layer
+            </button>
+            <div style="margin-top:18px;">
+              <div class="panel-title" style="font-size:12.5px;">Tower visualization</div>
+              <div class="tower" id="tower-viz" style="margin-top:8px;"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="panel-title">Reinstatement premium calculator</div>
+            <div class="panel-sub">Pro-rata as to amount and, where selected, as to time</div>
+            <div class="field-row">
+              <div class="field"><label>Layer limit</label><input type="number" id="ri-limit" value="10000000" step="500000"></div>
+              <div class="field"><label>Loss recovered</label><input type="number" id="ri-loss" value="6500000" step="100000"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Original layer premium</label><input type="number" id="ri-prem" value="850000" step="10000"></div>
+              <div class="field"><label>Reinstatement %</label><input type="number" id="ri-pct" value="100" step="5"></div>
+            </div>
+            <div class="field">
+              <label>Time remaining in period (pro-rata temporis)</label>
+              <input type="range" id="ri-time" min="0" max="100" value="40">
+              <div class="hint"><span id="ri-time-label">40%</span> of the annual period remains when the loss occurs</div>
+            </div>
+            <div class="calc-out" id="ri-out" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= BROKER: BORDEREAUX ================= -->
+    <section class="view" id="view-bordereaux" hidden>
+      <div class="view-head">
+        <div>
+          <h1>Bordereaux Processing</h1>
+          <p>Premium and loss bordereaux, matched to treaty terms and posted straight to the technical account.</p>
+        </div>
+        <button class="btn primary" onclick="simulateUpload()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15.5V4.5M8 8.5 12 4.5 16 8.5"/><path d="M4.5 15.5v3a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-3"/></svg>
+          Upload Bordereau
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Period</th><th>Cedant / Program</th><th>Type</th><th class="num">Lines</th><th class="num">Amount</th><th>Status</th></tr></thead>
+          <tbody id="bdx-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= BROKER: CLAIMS ================= -->
+    <section class="view" id="view-claims" hidden>
+      <div class="view-head">
+        <div>
+          <h1>Claims</h1>
+          <p>Every claim tested against its program's layers automatically, with reserve movement tracked to the technical account.</p>
+        </div>
+        <button class="btn primary" onclick="addClaim()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Register Claim
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date of loss</th><th>Program</th><th>Cause</th><th>Layer allocation</th><th class="num">Reserve</th><th>Premium</th><th>Status</th><th></th></tr></thead>
+          <tbody id="claims-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= BROKER: ACCOUNTING ================= -->
+    <section class="view" id="view-accounting" hidden>
+      <div class="view-head">
+        <div>
+          <h1>Accounting &amp; Finance</h1>
+          <p>One running technical account per program, and the invoices, credit notes and debit notes that flow from every bind, endorsement and cancellation.</p>
+        </div>
+      </div>
+      <div class="tabs" id="acc-tabs">
+        <div class="tab active" data-a="tech">Technical Accounts</div>
+        <div class="tab" data-a="finance">Finance Documents</div>
+      </div>
+
+      <div id="acc-tech">
+        <div class="field" style="max-width:360px;">
+          <label>Select program</label>
+          <select id="acc-select"></select>
+        </div>
+        <div class="cols-2">
+          <div class="card">
+            <div class="panel-title">Technical account</div>
+            <div class="panel-sub" id="acc-sub"></div>
+            <div class="calc-out" id="acc-out"></div>
+          </div>
+          <div class="card">
+            <div class="panel-title">Aged creditor position — reinsurers</div>
+            <div class="panel-sub">Balances due from the desk to its markets</div>
+            <div id="aged-table"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="acc-finance" hidden>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Doc #</th><th>Type</th><th>Program</th><th>Counterparty</th><th class="num">Amount</th><th>Date</th><th>Co-broking</th></tr></thead>
+            <tbody id="finance-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= BROKER: REPORTS ================= -->
+    <section class="view" id="view-reports" hidden>
+      <div class="view-head">
+        <div><h1>Reports &amp; Exposure</h1><p>Loss ratio by program and accumulation across the reinsurer panel.</p></div>
+      </div>
+      <div class="cols-2">
+        <div class="card">
+          <div class="panel-title">Loss ratio by program</div>
+          <div class="panel-sub">Incurred claims ÷ earned premium, current underwriting year</div>
+          <div id="chart-lr"></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Market accumulation</div>
+          <div class="panel-sub">Signed capacity committed per reinsurer, all live programs</div>
+          <div id="exposure-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= BROKER: REGISTRY ================= -->
+    <section class="view" id="view-registry" hidden>
+      <div class="view-head">
+        <div><h1>Registry</h1><p>The address book behind every submission — cedants, underwriting markets and service counterparties, categorized.</p></div>
+      </div>
+      <div class="cols-registry">
+        <div class="card">
+          <div class="panel-title">Cedant <span class="count" id="reg-count-cedant"></span></div>
+          <div class="panel-sub">Insurers ceding business to the desk — KYC status, country, last refresh.</div>
+          <div id="cedant-table"></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Reinsurance <span class="count" id="reg-count-reinsurance"></span></div>
+          <div class="panel-sub">Company-form reinsurers — security rating and lead panel.</div>
+          <div id="reinsurance-table"></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Lloyd's Syndicate <span class="count" id="reg-count-syndicate"></span></div>
+          <div class="panel-sub">Capacity written through Lloyd's, by syndicate.</div>
+          <div id="syndicate-table"></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Reinsurance Brokers <span class="count" id="reg-count-brokers"></span></div>
+          <div class="panel-sub">Co-broking and local placement partners sharing commission on a slip.</div>
+          <div id="brokers-table"></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Others <span class="count" id="reg-count-others"></span></div>
+          <div class="panel-sub">Claims TPAs, modeling and advisory counterparties outside the underwriting panel.</div>
+          <div id="others-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CEDANT: MY PROGRAMS ================= -->
+    <section class="view" id="view-c-programs" hidden>
+      <div class="view-head">
+        <div>
+          <h1>My Programs</h1>
+          <p>Everything Meridian Bridge Re Brokers is placing on your behalf — a read-only mirror of your own book.</p>
+        </div>
+      </div>
+      <div class="banner brass">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        The cedant portal is an optional, restricted view. Your broker sees the full placement, accounting and claims workspace — you see only your own programs, submissions and statements.
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Program</th><th>Class</th><th>Type</th><th class="num">Gross Premium</th><th>Status</th><th>Expiry</th></tr></thead>
+          <tbody id="c-programs-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= CEDANT: SUBMIT ================= -->
+    <section class="view" id="view-c-submit" hidden>
+      <div class="view-head">
+        <div><h1>Submit a Risk or Renewal</h1><p>Sends a structured request straight into your broker's placement queue.</p></div>
+      </div>
+      <div class="card" style="max-width:560px;">
+        <div class="field"><label>Class of business</label>
+          <select id="cs-class"><option>Property</option><option>Casualty</option><option>Marine</option><option>Motor</option></select>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Requested type</label>
+            <select id="cs-type"><option>Facultative</option><option>Quota Share</option><option>Surplus</option><option>Excess of Loss</option></select>
+          </div>
+          <div class="field"><label>Sum insured / estimated GNPI</label><input type="number" id="cs-amount" value="5000000" step="50000"></div>
+        </div>
+        <div class="field"><label>Notes for your broker</label><textarea id="cs-notes" rows="3" placeholder="Anything the placement team should know — loss history, timing, target markets...">Renewal terms as expiring, please; new warehouse location added mid-term.</textarea></div>
+        <button class="btn primary" onclick="submitCedantRisk()">Send to broker</button>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="panel-title">Pending with your broker</div>
+        <div id="c-pending"></div>
+      </div>
+    </section>
+
+    <!-- ================= CEDANT: BORDEREAUX ================= -->
+    <section class="view" id="view-c-bdx" hidden>
+      <div class="view-head">
+        <div><h1>Upload Bordereau</h1><p>Submit your periodic premium or loss bordereau directly to the treaty account.</p></div>
+      </div>
+      <div class="card" style="max-width:560px;">
+        <div class="field-row">
+          <div class="field"><label>Program</label><select id="cb-program"></select></div>
+          <div class="field"><label>Type</label><select id="cb-type"><option>Premium</option><option>Loss</option></select></div>
+        </div>
+        <div class="field"><label>Period</label><input type="text" id="cb-period" value="Q3 2026"></div>
+        <div class="field"><label>File</label>
+          <div style="border:1.5px dashed var(--line); border-radius:8px; padding:22px; text-align:center; color:var(--ink-soft); font-size:12.5px;">
+            Drop a spreadsheet here, or <button class="btn ghost" style="padding:4px 8px;" onclick="document.getElementById('cb-amount-wrap').hidden=false">browse</button>
+          </div>
+        </div>
+        <div class="field" id="cb-amount-wrap" hidden><label>Total amount (from file)</label><input type="number" id="cb-amount" value="245000" step="1000"></div>
+        <button class="btn primary" onclick="submitCedantBdx()">Submit bordereau</button>
+      </div>
+    </section>
+
+    <!-- ================= CEDANT: STATEMENT ================= -->
+    <section class="view" id="view-c-statement" hidden>
+      <div class="view-head">
+        <div><h1>Account Statement</h1><p>Your treaty account with Meridian Bridge Re Brokers, current underwriting year.</p></div>
+      </div>
+      <div class="card" style="max-width:560px;">
+        <div class="calc-out" id="c-statement-out"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ================= NEW SUBMISSION WIZARD ================= -->
+<div class="modal-backdrop" id="wizard-backdrop" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="panel-title" style="margin:0;">New Submission</div>
+        <div class="panel-sub" style="margin:2px 0 0;" id="wizard-step-label">Step 1 of 4 · Risk basics</div>
+      </div>
+      <button class="close-x" onclick="closeWizard()">✕</button>
+    </div>
+    <div class="modal-body" id="wizard-body"></div>
+    <div class="modal-foot">
+      <div class="step-dots"><span class="active"></span><span></span><span></span><span></span></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="wizard-back" onclick="wizardBack()">Back</button>
+        <button class="btn primary" id="wizard-next" onclick="wizardNext()">Continue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PROGRAM DETAIL / LIFECYCLE DRAWER ================= -->
+<div class="modal-backdrop" id="detail-backdrop" hidden>
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-head">
+      <div>
+        <div class="panel-title" style="margin:0;" id="detail-title">Program</div>
+        <div class="panel-sub" style="margin:2px 0 0;" id="detail-sub"></div>
+      </div>
+      <button class="close-x" onclick="closeProgramDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- sample data ----------
+  // Cedant book — original 4 (referenced by exact name across programs/claims/finance,
+  // do not rename) plus a broader SEA cedant book reflecting the desk's regional registry.
+  var cedants = [
+    {name:"Meridian Mutual Insurance", country:"United States", kyc:"Current", refreshed:"2026-03-11"},
+    {name:"Pacífico General Insurance", country:"Chile", kyc:"Current", refreshed:"2026-01-22"},
+    {name:"Sahara Takaful Insurance", country:"United Arab Emirates", kyc:"Current", refreshed:"2025-11-08"},
+    {name:"Northwind Assurance Co.", country:"Canada", kyc:"Review due", refreshed:"2025-06-02"},
+    {name:"Garuda Nusantara Life", country:"Indonesia", kyc:"Current", refreshed:"2026-07-19"},
+    {name:"Cempaka Sejahtera Insurance", country:"Indonesia", kyc:"Current", refreshed:"2026-05-02"},
+    {name:"Selat General Takaful", country:"Malaysia", kyc:"Review due", refreshed:"2025-09-30"},
+    {name:"Raffles Harbour Insurance", country:"Singapore", kyc:"Current", refreshed:"2026-04-14"},
+    {name:"Chao Phraya General Insurance", country:"Thailand", kyc:"Current", refreshed:"2026-02-27"},
+    {name:"Mekong Delta Assurance", country:"Vietnam", kyc:"Review due", refreshed:"2025-08-11"}
+  ];
+  // Underwriting markets — company-form reinsurers and Lloyd's syndicates, tagged by
+  // `type` so the registry can split them while the wizard/report code below keeps
+  // treating this as one flat capacity panel. The original 6 entries are referenced by
+  // exact name in marketConfirmations elsewhere in this file — do not rename/remove them.
+  var markets = [
+    {name:"Helvetia Continental Re", rating:"AA- (S&P)", panel:"Property Cat", capacity:0, type:"Reinsurance"},
+    {name:"Zenith Re · Syndicate 2044", rating:"A+ (AM Best)", panel:"Property Cat", capacity:0, type:"Lloyds Syndicate"},
+    {name:"Andean Capacity Re", rating:"A (S&P)", panel:"LatAm Treaty", capacity:0, type:"Reinsurance"},
+    {name:"Northbridge Reinsurance SE", rating:"AA (S&P)", panel:"Global Treaty", capacity:0, type:"Reinsurance"},
+    {name:"Comstock Re", rating:"A- (AM Best)", panel:"Global Treaty", capacity:0, type:"Reinsurance"},
+    {name:"Baltic Shield Re", rating:"A (S&P)", panel:"Marine & Cargo", capacity:0, type:"Reinsurance"},
+    {name:"Nanyang Re", rating:"A (S&P)", panel:"SEA Treaty", capacity:0, type:"Reinsurance"},
+    {name:"Meridian Gulf Re", rating:"A (AM Best)", panel:"Energy & Property", capacity:0, type:"Reinsurance"},
+    {name:"Sequoia Continental Re", rating:"AA- (S&P)", panel:"Global Treaty", capacity:0, type:"Reinsurance"},
+    {name:"Tyrrhenian Re", rating:"A- (S&P)", panel:"Marine & Cargo", capacity:0, type:"Reinsurance"},
+    {name:"Anatolia Re", rating:"B+ (AM Best)", panel:"Regional Property", capacity:0, type:"Reinsurance"},
+    {name:"Sahel Re", rating:"B (AM Best)", panel:"Regional Property", capacity:0, type:"Reinsurance"},
+    {name:"Marlow Underwriting · Syndicate 1918", rating:"A+ (AM Best)", panel:"Property Cat", capacity:0, type:"Lloyds Syndicate"},
+    {name:"Copperfield Re · Syndicate 3350", rating:"A+ (AM Best)", panel:"Marine & Cargo", capacity:0, type:"Lloyds Syndicate"},
+    {name:"Sextant Re · Syndicate 2711", rating:"A+ (AM Best)", panel:"SEA Treaty", capacity:0, type:"Lloyds Syndicate"}
+  ];
+  // Reinsurance brokers — co-broking / local placement partners who share commission on
+  // a slip rather than take a signed line. "Andean Risk Partners" is the co-broker
+  // already referenced on P-1002 and in Accounting/Finance — kept first for consistency.
+  var brokers = [
+    {name:"Andean Risk Partners", country:"Chile", role:"Co-broker", status:"Active"},
+    {name:"Nusantara Re Brokers", country:"Indonesia", role:"Local placement partner", status:"Active"},
+    {name:"Selendang Reinsurance Brokers", country:"Indonesia", role:"Local placement partner", status:"Active"},
+    {name:"Marina Bay Re Partners", country:"Singapore", role:"Co-broker", status:"Active"},
+    {name:"Kinabalu Reinsurance Services", country:"Malaysia", role:"Local placement partner", status:"Review due"}
+  ];
+  // Others — service counterparties outside the underwriting panel (claims TPAs,
+  // catastrophe modeling, actuarial, offshore captive vehicles).
+  var others = [
+    {name:"Northshore Claims TPA", country:"United Kingdom", role:"Claims TPA", status:"Active"},
+    {name:"Tremor Risk Analytics", country:"United States", role:"Cat modeling vendor", status:"Active"},
+    {name:"Kestrel Actuarial Services", country:"Singapore", role:"Actuarial consultancy", status:"Active"},
+    {name:"Labuan Sentinel Re", country:"Malaysia (Labuan)", role:"Captive reinsurer", status:"Review due"}
+  ];
+
+  var TODAY = new Date("2026-09-18");
+  var programs = [
+    {id:"P-1001", cedant:"Meridian Mutual Insurance", cls:"Property", type:"Excess of Loss", structure:"3-layer tower, $40m xs $5m", premium:4650000, ccy:"USD", status:"Bound", expiry:"2027-01-01", loss:6800000, earned:4650000,
+      premiumPaid:true, coBroker:null, bindingInstructions:"Settle via Meridian Bridge client account, 30-day terms.",
+      marketConfirmations:[{m:"Helvetia Continental Re",s:"Confirmed"},{m:"Northbridge Reinsurance SE",s:"Confirmed"},{m:"Comstock Re",s:"Confirmed"}],
+      documents:[{name:"Slip v2 — signed.pdf", from:"Broker", date:"2026-01-04", type:"Slip"},{name:"Layer 1 confirmation.pdf", from:"Helvetia Continental Re", date:"2026-01-06", type:"Confirmation"}]},
+    {id:"P-1002", cedant:"Pacífico General Insurance", cls:"Property", type:"Quota Share", structure:"35% cession, 28% commission", premium:18400000, ccy:"USD", status:"Bound", expiry:"2027-04-01", loss:8200000, earned:18400000,
+      premiumPaid:true, coBroker:{name:"Andean Risk Partners", split:30}, bindingInstructions:"Quarterly bordereaux-driven settlement, USD.",
+      marketConfirmations:[{m:"Andean Capacity Re",s:"Confirmed"},{m:"Northbridge Reinsurance SE",s:"Confirmed"}],
+      documents:[{name:"QS slip — signed.pdf", from:"Broker", date:"2026-04-02", type:"Slip"}]},
+    {id:"P-1003", cedant:"Sahara Takaful Insurance", cls:"Marine", type:"Facultative", structure:"Single risk · cargo, $40m SI", premium:186000, ccy:"USD", status:"Bound", expiry:"2027-02-14", loss:340000, earned:186000,
+      premiumPaid:true, coBroker:null, bindingInstructions:"Single premium, payable at inception.",
+      marketConfirmations:[{m:"Baltic Shield Re",s:"Confirmed"}],
+      documents:[{name:"Fac slip — signed.pdf", from:"Broker", date:"2026-02-10", type:"Slip"}]},
+    {id:"P-1004", cedant:"Northwind Assurance Co.", cls:"Motor", type:"Surplus", structure:"9 lines xs $500k retention", premium:2260000, ccy:"CAD", status:"Bound", expiry:"2027-01-01", loss:980000, earned:2260000,
+      premiumPaid:false, coBroker:null, bindingInstructions:"Monthly bordereaux, CAD settlement.",
+      marketConfirmations:[{m:"Comstock Re",s:"Confirmed"}],
+      documents:[{name:"Surplus slip — signed.pdf", from:"Broker", date:"2025-12-20", type:"Slip"}]},
+    {id:"P-1005", cedant:"Meridian Mutual Insurance", cls:"Casualty", type:"Quota Share", structure:"20% cession, 25% commission", premium:6100000, ccy:"USD", status:"Renewal Due", expiry:"2026-11-05", loss:2100000, earned:5400000,
+      premiumPaid:true, coBroker:null, bindingInstructions:"",
+      marketConfirmations:[{m:"Northbridge Reinsurance SE",s:"Confirmed"},{m:"Comstock Re",s:"Confirmed"}],
+      documents:[]},
+    {id:"P-1006", cedant:"Pacífico General Insurance", cls:"Property", type:"Excess of Loss", structure:"$30m xs $10m, 2 reinst.", premium:1980000, ccy:"USD", status:"Negotiating", expiry:"2027-06-01", loss:0, earned:0,
+      premiumPaid:false, coBroker:null, bindingInstructions:"",
+      marketConfirmations:[{m:"Zenith Re · Syndicate 2044",s:"Confirmed"},{m:"Andean Capacity Re",s:"Queried"},{m:"Baltic Shield Re",s:"Sent"}],
+      documents:[{name:"Slip v1 — issued.pdf", from:"Broker", date:"2026-08-28", type:"Slip"},{name:"Query — reinstatement wording.eml", from:"Andean Capacity Re", date:"2026-09-02", type:"Query"}]},
+    {id:"P-1007", cedant:"Meridian Mutual Insurance", cls:"Property", type:"Facultative", structure:"Warehouse extension endorsement, $8m SI", premium:64000, ccy:"USD", status:"Cedant Approval", expiry:"2027-01-01", loss:0, earned:0,
+      premiumPaid:false, coBroker:null, bindingInstructions:"",
+      marketConfirmations:[{m:"Baltic Shield Re",s:"Confirmed"}],
+      documents:[{name:"Slip — confirmed.pdf", from:"Baltic Shield Re", date:"2026-09-12", type:"Confirmation"}]}
+  ];
+
+  var bordereaux = [
+    {period:"Q2 2026", program:"P-1002 · Pacífico General", type:"Premium", lines:214, amount:4600000, status:"Matched"},
+    {period:"Q2 2026", program:"P-1004 · Northwind", type:"Loss", lines:12, amount:310000, status:"Matched"},
+    {period:"Q1 2026", program:"P-1002 · Pacífico General", type:"Loss", lines:31, amount:1950000, status:"Exception"},
+    {period:"Q1 2026", program:"P-1005 · Meridian Mutual", type:"Premium", lines:88, amount:1520000, status:"Matched"}
+  ];
+
+  var claims = [
+    {dol:"2026-08-14", program:"P-1001 · Meridian Mutual XL", cause:"Hurricane Milo — wind & storm surge", layer:"Layer 1 exhausted, Layer 2 42% used", reserve:6800000, status:"Under Review"},
+    {dol:"2026-05-02", program:"P-1002 · Pacífico General QS", cause:"Warehouse fire, Valparaíso", layer:"Quota share, 35% ceded", reserve:1150000, status:"Agreed"},
+    {dol:"2026-03-19", program:"P-1003 · Sahara Takaful Fac", cause:"Cargo loss overboard, transit LA–Jebel Ali", layer:"Facultative, 100% ceded", reserve:340000, status:"Paid"},
+    {dol:"2026-09-05", program:"P-1004 · Northwind Surplus", cause:"Rear-end collision, fleet vehicle #12", layer:"Surplus, 82% ceded", reserve:145000, status:"Notified"}
+  ];
+
+  var financeDocs = [
+    {id:"INV-2031", type:"Invoice", program:"P-1001", counterparty:"Helvetia Continental Re", amount:1320000, ccy:"USD", date:"2026-01-05", co:null},
+    {id:"INV-2032", type:"Invoice", program:"P-1002", counterparty:"Andean Capacity Re", amount:1932000, ccy:"USD", date:"2026-04-03", co:"Andean Risk Partners · 30%"},
+    {id:"CN-0114", type:"Credit Note", program:"P-1004", counterparty:"Comstock Re", amount:64000, ccy:"CAD", date:"2026-07-18", co:null},
+    {id:"DN-0087", type:"Debit Note", program:"P-1001", counterparty:"Northbridge Reinsurance SE", amount:221000, ccy:"USD", date:"2026-08-20", co:null}
+  ];
+  var financeSeq = 2033, cnSeq = 115, dnSeq = 88;
+
+  var pendingSubmissions = [];
+  var claimSeq = 5, bdxSeq = 5, progSeq = 1008;
+
+  // ---------- helpers ----------
+  function fmt(n, ccy){
+    ccy = ccy || "USD";
+    var abs = Math.abs(n);
+    var s = abs >= 1000000 ? (n/1000000).toFixed(2)+"m" : abs >= 1000 ? (n/1000).toFixed(0)+"k" : n.toFixed(0);
+    return (n<0?"-":"") + ccy + " " + s;
+  }
+  function fmtFull(n, ccy){ return (ccy||"USD") + " " + Math.round(n).toLocaleString("en-US"); }
+  function pct(n){ return n.toFixed(1)+"%"; }
+  function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+  function typeClass(t){ return t==="Facultative"?"fac":t==="Quota Share"?"qs":t==="Surplus"?"surplus":"xol"; }
+  function statusPill(s){
+    var map={"Bound":"good","In Placement":"info","Issue Slip":"info","Sent for Confirmation":"info","Sent":"info","Viewed":"info","Confirmed":"good","Queried":"warn","Negotiating":"warn","Cedant Approval":"warn","Renewal Due":"warn","Matched":"good","Exception":"bad","Under Review":"warn","Agreed":"good","Paid":"good","Notified":"bad","Pending Credit Control":"bad","Overdue":"bad","Active":"good","Review due":"warn"};
+    return '<span class="pill '+(map[s]||"neutral")+'">'+s+'</span>';
+  }
+  function programById(id){ return programs.filter(function(p){return p.id===id;})[0]; }
+  function programIdFromLabel(label){ return (label||"").split(" ")[0]; }
+  function daysBetween(a,b){ return Math.round((b-a)/86400000); }
+
+  // ---------- nav ----------
+  var brokerViews = ["dashboard","placements","treaty","bordereaux","claims","accounting","reports","registry"];
+  var cedantViews = ["c-programs","c-submit","c-bdx","c-statement"];
+
+  function showView(id){
+    brokerViews.concat(cedantViews).forEach(function(v){
+      var s = document.getElementById("view-"+v);
+      if(s) s.hidden = (v!==id);
+    });
+    document.querySelectorAll(".nav-item").forEach(function(b){ b.classList.toggle("active", b.dataset.view===id); });
+  }
+  document.querySelectorAll(".nav-item").forEach(function(b){
+    b.addEventListener("click", function(){ showView(b.dataset.view); });
+  });
+
+  document.getElementById("role-broker").addEventListener("click", function(){ setRole("broker"); });
+  document.getElementById("role-cedant").addEventListener("click", function(){ setRole("cedant"); });
+  function setRole(role){
+    var isCedant = role==="cedant";
+    document.getElementById("role-broker").classList.toggle("active", !isCedant);
+    document.getElementById("role-cedant").classList.toggle("active", isCedant);
+    document.getElementById("nav-broker").hidden = isCedant;
+    document.getElementById("nav-cedant").hidden = !isCedant;
+    document.getElementById("cedant-flag-chip").hidden = !isCedant;
+    document.getElementById("avatar").textContent = isCedant ? "MM" : "VR";
+    document.getElementById("sidebar-foot").textContent = isCedant ? "Meridian Mutual Insurance · read-only" : "Underwriting year 2026 · USD reporting";
+    showView(isCedant ? "c-programs" : "dashboard");
+  }
+
+  // ---------- dashboard ----------
+  function renderDashboard(){
+    var totalPrem = programs.reduce(function(s,p){ return s + (p.ccy==="USD"?p.premium:p.premium*0.73); },0);
+    var totalLoss = programs.reduce(function(s,p){ return s + (p.ccy==="USD"?p.loss:p.loss*0.73); },0);
+    var totalEarned = programs.reduce(function(s,p){ return s + (p.ccy==="USD"?p.earned:p.earned*0.73); },0);
+    var lr = totalEarned ? (totalLoss/totalEarned*100) : 0;
+    var openClaims = claims.filter(function(c){ return c.status!=="Paid"; }).length;
+    var agedDebt = 2140000;
+
+    var kpis = [
+      {label:"Bound premium (USD eq.)", value: fmt(totalPrem), delta:"+8.4% vs prior year", up:true},
+      {label:"Portfolio loss ratio", value: pct(lr), delta: lr>70?"above 70% watch line":"within appetite", up:lr<=70},
+      {label:"Open claims", value: openClaims, delta: openClaims+" across "+programs.length+" programs", up:true},
+      {label:"Aged reinsurer creditor", value: fmt(agedDebt), delta:"3 balances > 60 days", up:false}
+    ];
+    var row = document.getElementById("kpi-row"); row.innerHTML="";
+    kpis.forEach(function(k){
+      var c = el("div","card");
+      c.innerHTML = '<div class="kpi-label">'+k.label+'</div><div class="kpi-value">'+k.value+'</div><div class="kpi-delta '+(k.up?"up":"down")+'">'+k.delta+'</div>';
+      row.appendChild(c);
+    });
+
+    // bar chart: premium by class
+    var byClass = {};
+    programs.forEach(function(p){ var v=p.ccy==="USD"?p.premium:p.premium*0.73; byClass[p.cls]=(byClass[p.cls]||0)+v; });
+    var classes = Object.keys(byClass);
+    var max = Math.max.apply(null, classes.map(function(c){return byClass[c];}));
+    var barColors = ["#1f6f78","#a97a2f","#3a5f8a","#b1701c"];
+    var bw=48, gap=28, h=160, w = classes.length*(bw+gap);
+    var svg = '<svg viewBox="0 0 '+w+' '+(h+30)+'" width="100%" height="200" preserveAspectRatio="xMinYMid meet">';
+    classes.forEach(function(c,i){
+      var bh = Math.max(4, byClass[c]/max*h);
+      var x = i*(bw+gap)+gap/2;
+      svg += '<rect x="'+x+'" y="'+(h-bh)+'" width="'+bw+'" height="'+bh+'" rx="4" fill="'+barColors[i%barColors.length]+'"></rect>';
+      svg += '<text x="'+(x+bw/2)+'" y="'+(h+18)+'" text-anchor="middle" font-size="11" fill="var(--ink-soft)" font-family="IBM Plex Sans">'+c+'</text>';
+      svg += '<text x="'+(x+bw/2)+'" y="'+(h-bh-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink)" font-family="IBM Plex Mono">'+fmt(byClass[c])+'</text>';
+    });
+    svg += '</svg>';
+    document.getElementById("chart-bar").innerHTML = svg;
+
+    // line chart: loss ratio trend (sample quarters)
+    var trend = [58,64,61,70,66,lr];
+    var lw=440, lh=140, pad=14;
+    var pts = trend.map(function(v,i){ return [pad + i*((lw-2*pad)/(trend.length-1)), lh - (v/100)*lh]; });
+    var path = pts.map(function(p,i){ return (i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1); }).join(" ");
+    var area = path + " L"+pts[pts.length-1][0]+","+lh+" L"+pts[0][0]+","+lh+" Z";
+    var lsvg = '<svg viewBox="0 0 '+lw+' '+(lh+26)+'" width="100%" height="180" preserveAspectRatio="xMinYMid meet">';
+    lsvg += '<line x1="'+pad+'" y1="'+(lh-0.7*lh)+'" x2="'+(lw-pad)+'" y2="'+(lh-0.7*lh)+'" stroke="var(--line)" stroke-dasharray="3,3"/>';
+    lsvg += '<path d="'+area+'" fill="var(--marine)" opacity="0.12"></path>';
+    lsvg += '<path d="'+path+'" fill="none" stroke="var(--marine)" stroke-width="2.5"></path>';
+    pts.forEach(function(p,i){ lsvg += '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(i===pts.length-1?4:2.5)+'" fill="var(--marine)"></circle>'; });
+    lsvg += '<text x="'+pad+'" y="'+(lh-0.7*lh-5)+'" font-size="10" fill="var(--ink-soft)" font-family="IBM Plex Mono">70% watch line</text>';
+    lsvg += '<text x="'+pts[pts.length-1][0]+'" y="'+(pts[pts.length-1][1]-10)+'" text-anchor="end" font-size="11" fill="var(--marine-ink)" font-family=\'IBM Plex Mono\'>'+pct(trend[trend.length-1])+'</text>';
+    lsvg += '</svg>';
+    document.getElementById("chart-line").innerHTML = lsvg;
+
+    // activity feed
+    var acts = [
+      ["P-1001 Layer 2 reinstatement premium posted", "Accounting", "2h ago"],
+      ["Q2 2026 loss bordereau flagged — currency mismatch", "Bordereaux", "5h ago"],
+      ["Sahara Takaful cargo claim moved to Paid", "Claims", "1d ago"],
+      ["P-1006 Cat XL — 4 of 6 markets signed (78%)", "Placements", "1d ago"]
+    ];
+    document.getElementById("activity-feed").innerHTML = acts.map(function(a){
+      return '<div style="display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--line-soft); font-size:13px;"><span>'+a[0]+'</span><span style="color:var(--ink-soft); white-space:nowrap;">'+a[1]+' · '+a[2]+'</span></div>';
+    }).join("");
+  }
+
+  // ---------- placements ----------
+  var placementFilter = "all";
+  function renderPlacements(){
+    var body = document.getElementById("placements-body"); body.innerHTML="";
+    programs.filter(function(p){ return placementFilter==="all" || p.type===placementFilter; }).forEach(function(p){
+      var tr = el("tr");
+      tr.innerHTML = '<td><strong>'+p.id+'</strong></td><td>'+p.cedant+'</td><td>'+p.cls+'</td>'+
+        '<td><span class="type-badge '+typeClass(p.type)+'">'+p.type+'</span></td>'+
+        '<td>'+p.structure+'</td><td class="num">'+fmtFull(p.premium,p.ccy)+'</td><td>'+statusPill(p.status)+'</td>'+
+        '<td><button class="btn ghost" style="padding:5px 10px;" onclick="openProgramDetail(\''+p.id+'\')">Lifecycle →</button></td>';
+      body.appendChild(tr);
+    });
+  }
+  document.querySelectorAll("#placement-filter button").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll("#placement-filter button").forEach(function(x){x.classList.remove("active");});
+      b.classList.add("active"); placementFilter=b.dataset.f; renderPlacements();
+    });
+  });
+
+  // ---------- treaty tabs ----------
+  document.querySelectorAll("#treaty-tabs .tab").forEach(function(t){
+    t.addEventListener("click", function(){
+      document.querySelectorAll("#treaty-tabs .tab").forEach(function(x){x.classList.remove("active");});
+      t.classList.add("active");
+      ["qs","surplus","xol"].forEach(function(k){ document.getElementById("treaty-"+k).hidden = (k!==t.dataset.t); });
+    });
+  });
+
+  function computeQS(){
+    var gnpi = +document.getElementById("qs-gnpi").value || 0;
+    var cession = +document.getElementById("qs-cession").value || 0;
+    var comm = +document.getElementById("qs-comm").value || 0;
+    var brok = +document.getElementById("qs-brok").value || 0;
+    var ceded = gnpi*cession/100;
+    var cedingComm = ceded*comm/100;
+    var brokerage = ceded*brok/100;
+    var net = ceded - cedingComm - brokerage;
+    document.getElementById("qs-out").innerHTML =
+      row("Ceded premium", fmtFull(ceded)) +
+      row("Ceding commission", fmtFull(cedingComm)) +
+      row("Brokerage", fmtFull(brokerage)) +
+      row("Net premium to reinsurers", fmtFull(net));
+  }
+  function row(a,b){ return '<div class="row"><span>'+a+'</span><span>'+b+'</span></div>'; }
+  ["qs-gnpi","qs-cession","qs-comm","qs-brok"].forEach(function(id){ document.getElementById(id).addEventListener("input", computeQS); });
+
+  function computeSurplus(){
+    var si = +document.getElementById("sp-si").value || 0;
+    var ret = +document.getElementById("sp-ret").value || 1;
+    var lines = +document.getElementById("sp-lines").value || 0;
+    var prem = +document.getElementById("sp-prem").value || 0;
+    var maxCover = ret*(1+lines);
+    var cededSI = Math.max(0, Math.min(si, maxCover) - ret);
+    var cessionPct = si>0 ? (cededSI/si*100) : 0;
+    var cededPrem = prem*cessionPct/100;
+    document.getElementById("sp-out").innerHTML =
+      row("Max treaty capacity", fmtFull(maxCover)) +
+      row("Ceded sum insured", fmtFull(cededSI)) +
+      row("Cession %", pct(cessionPct)) +
+      row("Ceded premium", fmtFull(cededPrem));
+  }
+  ["sp-si","sp-ret","sp-lines","sp-prem"].forEach(function(id){ document.getElementById(id).addEventListener("input", computeSurplus); });
+
+  // ---------- XoL layers & tower ----------
+  var layers = [
+    {limit:5000000, ret:5000000, rol:8.5},
+    {limit:10000000, ret:10000000, rol:4.2},
+    {limit:25000000, ret:20000000, rol:1.8}
+  ];
+  var towerColors = ["#b1701c","#1f6f78","#3a5f8a","#a97a2f","#7a5aa8"];
+  function renderLayers(){
+    var wrap = document.getElementById("layer-rows"); wrap.innerHTML="";
+    layers.forEach(function(l,i){
+      var r = el("div","layer-row");
+      r.innerHTML =
+        '<div class="field" style="margin-bottom:0;"><label>Layer '+(i+1)+' limit</label><input type="number" step="500000" value="'+l.limit+'" data-i="'+i+'" data-k="limit"></div>'+
+        '<div class="field" style="margin-bottom:0;"><label>Attachment (xs)</label><input type="number" step="500000" value="'+l.ret+'" data-i="'+i+'" data-k="ret"></div>'+
+        '<div class="field" style="margin-bottom:0;"><label>Layer premium</label><input type="number" step="10000" value="'+(l.premium||Math.round(l.limit*l.rol/100))+'" data-i="'+i+'" data-k="premium"></div>'+
+        '<div class="field" style="margin-bottom:0;"><label>Rate on line</label><div class="calc-out" style="padding:8px 10px;"><span class="mono" id="rol-'+i+'"></span></div></div>'+
+        '<button class="btn ghost" title="Remove layer" onclick="removeLayer('+i+')" style="padding:8px;">✕</button>';
+      wrap.appendChild(r);
+    });
+    wrap.querySelectorAll("input").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var i=+inp.dataset.i, k=inp.dataset.k;
+        layers[i][k] = +inp.value || 0;
+        if(k==="limit" || k==="premium"){ /* rol recomputed below */ }
+        updateRols(); renderTower();
+      });
+    });
+    updateRols();
+    renderTower();
+  }
+  function updateRols(){
+    layers.forEach(function(l,i){
+      var premEl = document.querySelectorAll('[data-i="'+i+'"][data-k="premium"]')[0];
+      var prem = premEl ? (+premEl.value||0) : Math.round(l.limit*l.rol/100);
+      var rol = l.limit ? (prem/l.limit*100) : 0;
+      var target = document.getElementById("rol-"+i);
+      if(target) target.textContent = rol.toFixed(2)+"%";
+    });
+  }
+  window.addLayer = function(){
+    var top = layers.reduce(function(m,l){ return Math.max(m, l.ret+l.limit); },0);
+    layers.push({limit:10000000, ret:top, rol:2.5});
+    renderLayers();
+  };
+  window.removeLayer = function(i){ layers.splice(i,1); renderLayers(); };
+  function renderTower(){
+    var totalTop = layers.reduce(function(m,l){ return Math.max(m, l.ret+l.limit); },0) || 1;
+    var baseRet = layers.length ? Math.min.apply(null, layers.map(function(l){return l.ret;})) : 0;
+    var el2 = document.getElementById("tower-viz"); el2.innerHTML="";
+    layers.forEach(function(l,i){
+      var h = Math.max(28, l.limit/totalTop*220);
+      var d = el("div","layer");
+      d.style.height = h+"px";
+      d.style.background = towerColors[i%towerColors.length];
+      d.innerHTML = '<span>Layer '+(i+1)+' · '+fmt(l.limit)+' xs '+fmt(l.ret)+'</span><span class="mono" id="rol-tower-'+i+'"></span>';
+      el2.appendChild(d);
+    });
+    if(baseRet>0){
+      var rh = Math.max(20, baseRet/totalTop*220);
+      var rdiv = el("div","retention"); rdiv.style.height = Math.min(rh,60)+"px";
+      rdiv.textContent = "Cedant retention — "+fmt(baseRet);
+      el2.appendChild(rdiv);
+    }
+    layers.forEach(function(l,i){
+      var premEl = document.querySelectorAll('[data-i="'+i+'"][data-k="premium"]')[0];
+      var prem = premEl ? (+premEl.value||0) : 0;
+      var rol = l.limit ? (prem/l.limit*100) : 0;
+      var t = document.getElementById("rol-tower-"+i);
+      if(t) t.textContent = "ROL "+rol.toFixed(1)+"%";
+    });
+  }
+
+  function computeReinstatement(){
+    var limit = +document.getElementById("ri-limit").value || 1;
+    var loss = +document.getElementById("ri-loss").value || 0;
+    var prem = +document.getElementById("ri-prem").value || 0;
+    var rpct = +document.getElementById("ri-pct").value || 0;
+    var timeLeft = +document.getElementById("ri-time").value || 0;
+    document.getElementById("ri-time-label").textContent = timeLeft+"%";
+    var amountFrac = Math.min(1, loss/limit);
+    var reinstPrem = amountFrac * (timeLeft/100) * (rpct/100) * prem;
+    document.getElementById("ri-out").innerHTML =
+      row("Layer used (% of limit)", pct(amountFrac*100)) +
+      row("Time fraction applied", pct(timeLeft)) +
+      row("Reinstatement premium due", fmtFull(reinstPrem));
+  }
+  ["ri-limit","ri-loss","ri-prem","ri-pct"].forEach(function(id){ document.getElementById(id).addEventListener("input", computeReinstatement); });
+  document.getElementById("ri-time").addEventListener("input", computeReinstatement);
+
+  // ---------- bordereaux ----------
+  function renderBdx(){
+    var body = document.getElementById("bdx-body"); body.innerHTML="";
+    bordereaux.forEach(function(b){
+      var tr = el("tr");
+      tr.innerHTML = '<td>'+b.period+'</td><td>'+b.program+'</td><td>'+b.type+'</td><td class="num">'+b.lines+'</td><td class="num">'+fmtFull(b.amount)+'</td><td>'+statusPill(b.status)+'</td>';
+      body.appendChild(tr);
+    });
+  }
+  window.simulateUpload = function(){
+    var progs = ["P-1001 · Meridian Mutual","P-1002 · Pacífico General","P-1004 · Northwind","P-1005 · Meridian Mutual"];
+    var p = progs[Math.floor(Math.random()*progs.length)];
+    var type = Math.random()>0.5?"Premium":"Loss";
+    var status = Math.random()>0.25?"Matched":"Exception";
+    bordereaux.unshift({period:"Q3 2026", program:p, type:type, lines: Math.floor(20+Math.random()*180), amount: Math.floor(80000+Math.random()*2000000), status:status});
+    bdxSeq++;
+    renderBdx();
+    renderAccounting();
+  };
+
+  // ---------- claims ----------
+  function renderClaims(){
+    var body = document.getElementById("claims-body"); body.innerHTML="";
+    claims.forEach(function(c,i){
+      var prog = programById(programIdFromLabel(c.program));
+      var paid = prog ? prog.premiumPaid : true;
+      var blocked = !paid && c.status!=="Paid" && c.status!=="Agreed";
+      var tr = el("tr");
+      tr.innerHTML = '<td>'+c.dol+'</td><td>'+c.program+'</td><td>'+c.cause+'</td><td>'+c.layer+'</td><td class="num">'+fmtFull(c.reserve)+'</td>'+
+        '<td>'+(paid?statusPill("Paid"):statusPill("Overdue"))+'</td>'+
+        '<td>'+statusPill(blocked?"Pending Credit Control":c.status)+'</td>'+
+        '<td>'+(blocked
+          ? '<button class="btn ghost" style="padding:5px 10px;" disabled title="Premium outstanding — cleared by credit control before this claim can proceed">Held</button>'
+          : '<button class="btn ghost" style="padding:5px 10px;" onclick="processClaim('+i+')">Process</button>')+'</td>';
+      body.appendChild(tr);
+    });
+  }
+  window.processClaim = function(i){
+    var c = claims[i];
+    if(c.status==="Notified") c.status="Under Review"; else if(c.status==="Under Review") c.status="Agreed";
+    renderClaims();
+  };
+  window.addClaim = function(){
+    claims.unshift({dol:"2026-09-1"+(claimSeq%9), program:"P-1006 · Pacífico General XL", cause:"New notification — awaiting adjuster report", layer:"Testing against tower...", reserve: Math.floor(200000+Math.random()*900000), status:"Notified"});
+    claimSeq++;
+    renderClaims();
+  };
+
+  // ---------- accounting ----------
+  function techAccount(p){
+    var isXol = p.type==="Excess of Loss";
+    var isFac = p.type==="Facultative";
+    var cession = p.type==="Quota Share" ? 0.35 : p.type==="Surplus" ? 0.55 : 1;
+    var comm = isXol ? 0 : isFac ? 0.20 : 0.27;
+    var brok = 0.025;
+    var ceded = isXol ? p.premium : p.premium*cession;
+    var cedingComm = ceded*comm;
+    var brokerage = ceded*brok;
+    var claimsCeded = p.loss;
+    var net = ceded - cedingComm - brokerage - claimsCeded;
+    return {ceded:ceded, cedingComm:cedingComm, brokerage:brokerage, claims:claimsCeded, net:net};
+  }
+  function renderAccounting(){
+    var sel = document.getElementById("acc-select");
+    sel.innerHTML = programs.map(function(p){ return '<option value="'+p.id+'">'+p.id+' · '+p.cedant+' · '+p.cls+'</option>'; }).join("");
+    function paint(){
+      var p = programs.filter(function(x){return x.id===sel.value;})[0] || programs[0];
+      document.getElementById("acc-sub").textContent = p.type+" · "+p.structure+" · "+p.ccy;
+      var t = techAccount(p);
+      document.getElementById("acc-out").innerHTML =
+        row("Ceded / treaty premium", fmtFull(t.ceded,p.ccy)) +
+        row("Ceding commission", "−"+fmtFull(t.cedingComm,p.ccy)) +
+        row("Brokerage", "−"+fmtFull(t.brokerage,p.ccy)) +
+        row("Claims booked", "−"+fmtFull(t.claims,p.ccy)) +
+        row("Net technical result", fmtFull(t.net,p.ccy));
+    }
+    sel.addEventListener("change", paint);
+    paint();
+
+    var aged = [
+      {m:"Helvetia Continental Re", cur:420000, d30:0, d60:180000, d90:0},
+      {m:"Andean Capacity Re", cur:210000, d30:95000, d60:0, d90:60000},
+      {m:"Northbridge Reinsurance SE", cur:640000, d30:0, d60:0, d90:0}
+    ];
+    var t2 = '<div class="table-wrap"><table><thead><tr><th>Market</th><th class="num">Current</th><th class="num">30d</th><th class="num">60d</th><th class="num">90d+</th></tr></thead><tbody>';
+    aged.forEach(function(a){
+      t2 += '<tr><td>'+a.m+'</td><td class="num">'+fmt(a.cur)+'</td><td class="num">'+(a.d30?fmt(a.d30):"—")+'</td><td class="num">'+(a.d60?'<span class="pill warn" style="padding:1px 7px;">'+fmt(a.d60)+'</span>':"—")+'</td><td class="num">'+(a.d90?'<span class="pill bad" style="padding:1px 7px;">'+fmt(a.d90)+'</span>':"—")+'</td></tr>';
+    });
+    t2 += '</tbody></table></div>';
+    document.getElementById("aged-table").innerHTML = t2;
+  }
+
+  document.querySelectorAll("#acc-tabs .tab").forEach(function(t){
+    t.addEventListener("click", function(){
+      document.querySelectorAll("#acc-tabs .tab").forEach(function(x){x.classList.remove("active");});
+      t.classList.add("active");
+      document.getElementById("acc-tech").hidden = t.dataset.a!=="tech";
+      document.getElementById("acc-finance").hidden = t.dataset.a!=="finance";
+    });
+  });
+
+  function renderFinance(){
+    var body = document.getElementById("finance-body"); if(!body) return; body.innerHTML="";
+    financeDocs.forEach(function(f){
+      var badgeClass = f.type.replace(" ","-");
+      var tr = el("tr");
+      tr.innerHTML = '<td class="mono">'+f.id+'</td><td><span class="fin-badge '+badgeClass+'">'+f.type+'</span></td><td>'+f.program+'</td><td>'+f.counterparty+'</td><td class="num">'+fmtFull(f.amount,f.ccy)+'</td><td>'+f.date+'</td><td>'+(f.co?'<span class="pill info">'+f.co+'</span>':'—')+'</td>';
+      body.appendChild(tr);
+    });
+  }
+
+  // ---------- renewals (60-day loop) ----------
+  function renderRenewals(){
+    var wrap = document.getElementById("renewals-list");
+    var due = programs.map(function(p){ return {p:p, days: daysBetween(TODAY, new Date(p.expiry))}; })
+      .filter(function(x){ return x.days<=60; })
+      .sort(function(a,b){ return a.days-b.days; });
+    if(!due.length){ wrap.innerHTML = '<div class="empty">Nothing due for renewal in the next 60 days.</div>'; return; }
+    wrap.innerHTML = due.map(function(x){
+      var urgent = x.days<=30;
+      return '<div class="confirm-row"><span><strong>'+x.p.id+'</strong> · '+x.p.cedant+' · '+x.p.cls+' '+x.p.type+' — expires '+x.p.expiry+'</span>'+
+        '<span style="display:flex; align-items:center; gap:10px;"><span class="pill '+(urgent?"bad":"warn")+'">'+x.days+' days</span>'+
+        '<button class="btn primary" style="padding:6px 12px;" onclick="startRenewal(\''+x.p.id+'\')">Start Renewal (Issue Slip)</button></span></div>';
+    }).join("");
+  }
+  window.startRenewal = function(id){
+    var p = programById(id);
+    p.status = "Issue Slip";
+    p.marketConfirmations.forEach(function(mc){ mc.s = "Sent"; });
+    p.documents.unshift({name:"Renewal slip — issued.pdf", from:"Broker", date:TODAY.toISOString().slice(0,10), type:"Slip"});
+    renderRenewals(); renderPlacements(); renderDashboard();
+    openProgramDetail(id);
+  };
+
+  // ---------- program detail / lifecycle drawer ----------
+  var LIFECYCLE_STEPS = ["Issue Slip","Sent for Confirmation","Negotiating","Cedant Approval","Bound"];
+  function stepIndexFor(status){
+    if(status==="Bound") return 4;
+    if(status==="Cedant Approval") return 3;
+    if(status==="Negotiating") return 2;
+    if(status==="Sent for Confirmation") return 1;
+    if(status==="Issue Slip" || status==="Renewal Due" || status==="In Placement") return 0;
+    return 4;
+  }
+  window.openProgramDetail = function(id){
+    document.getElementById("detail-backdrop").hidden = false;
+    renderProgramDetail(id);
+  };
+  window.closeProgramDetail = function(){ document.getElementById("detail-backdrop").hidden = true; };
+
+  function renderProgramDetail(id){
+    var p = programById(id);
+    document.getElementById("detail-title").textContent = p.id+" · "+p.cedant;
+    document.getElementById("detail-sub").textContent = p.cls+" · "+p.type+" · "+p.structure;
+    var idx = stepIndexFor(p.status);
+    var stepper = '<div class="stepper">'+LIFECYCLE_STEPS.map(function(s,i){
+      return '<div class="step '+(i<idx?"done":i===idx?"current":"")+'">'+s+'</div>';
+    }).join("")+'</div>';
+
+    var allConfirmed = p.marketConfirmations.length>0 && p.marketConfirmations.every(function(mc){return mc.s==="Confirmed";});
+    var anyQueried = p.marketConfirmations.some(function(mc){return mc.s==="Queried";});
+
+    var markets = '<div class="panel-title" style="font-size:12.5px;">Reinsurer confirmations</div>'+
+      p.marketConfirmations.map(function(mc){
+        return '<div class="confirm-row"><span>'+mc.m+'</span>'+statusPill(mc.s)+'</div>';
+      }).join("") +
+      (p.status==="Bound" ? "" : '<button class="btn ghost" style="margin-top:8px;" onclick="sendSlipToMarkets(\''+p.id+'\')">Send / resend slip for confirmation</button>');
+
+    var docs = '<div class="panel-title" style="font-size:12.5px; margin-top:16px;">Document dropbox</div>'+
+      (p.documents.length ? p.documents.map(function(d){
+        return '<div class="doc-row"><span><span class="d-name">'+d.name+'</span><br><span class="d-meta">'+d.type+' · from '+d.from+' · '+d.date+'</span></span></div>';
+      }).join("") : '<div class="empty" style="padding:16px;">No documents yet.</div>') +
+      (p.status==="Bound" ? "" : '<button class="btn ghost" style="margin-top:6px;" onclick="addDocument(\''+p.id+'\')">+ Add document (simulate negotiation)</button>');
+
+    var bindSection = "";
+    if(p.status==="Bound"){
+      bindSection = '<div class="banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3L15.5 9.5"/></svg>Bound — instructions on file: '+(p.bindingInstructions||"none recorded")+'</div>';
+    } else {
+      if(p.status==="Cedant Approval"){
+        bindSection = '<div class="banner brass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>All markets confirmed — showing the client the final terms for sign-off.</div>';
+      }
+      bindSection += '<div class="field"><label>Binding instructions (payment terms, subjectivities, special conditions)</label><textarea id="detail-instructions" rows="2" placeholder="e.g. Settle within 30 days via client account; subject to updated loss bordereau.">'+(p.bindingInstructions||"")+'</textarea></div>'+
+        '<button class="btn primary" onclick="approveAndBind(\''+p.id+'\')" '+(allConfirmed?"":"disabled")+'>'+(allConfirmed?"Cedant approves — Bind":"Approve & Bind (needs all markets confirmed)")+'</button>'+
+        (anyQueried ? '<div class="hint" style="margin-top:6px;">One or more markets have queried terms — resolve via the document dropbox before binding.</div>' : "");
+    }
+
+    document.getElementById("detail-body").innerHTML = stepper + '<div class="cols-2">'+
+      '<div>'+markets+docs+'</div>'+
+      '<div><div class="panel-title" style="font-size:12.5px;">Binding</div>'+bindSection+'</div>'+
+      '</div>';
+  }
+
+  window.sendSlipToMarkets = function(id){
+    var p = programById(id);
+    if(p.status==="Issue Slip" || p.status==="Renewal Due"){ p.status="Sent for Confirmation"; }
+    p.marketConfirmations.forEach(function(mc,i){
+      if(mc.s==="Sent" || !mc.s){ mc.s = (i%3===2) ? "Queried" : "Confirmed"; }
+    });
+    if(p.marketConfirmations.some(function(mc){return mc.s==="Queried";})){ p.status="Negotiating"; }
+    else if(p.marketConfirmations.every(function(mc){return mc.s==="Confirmed";})){ p.status="Cedant Approval"; }
+    p.documents.push({name:"Confirmation round — "+TODAY.toISOString().slice(0,10)+".pdf", from:"Panel", date:TODAY.toISOString().slice(0,10), type:"Confirmation"});
+    renderProgramDetail(id); renderPlacements(); renderDashboard();
+  };
+  window.addDocument = function(id){
+    var p = programById(id);
+    p.documents.push({name:"Negotiation note "+(p.documents.length+1)+".pdf", from:"Broker", date:TODAY.toISOString().slice(0,10), type:"Negotiation"});
+    if(p.status==="Negotiating"){
+      var q = p.marketConfirmations.filter(function(mc){return mc.s==="Queried";})[0];
+      if(q) q.s = "Confirmed";
+      if(p.marketConfirmations.every(function(mc){return mc.s==="Confirmed";})) p.status = "Cedant Approval";
+    }
+    renderProgramDetail(id); renderPlacements();
+  };
+  window.approveAndBind = function(id){
+    var p = programById(id);
+    var allConfirmed = p.marketConfirmations.length>0 && p.marketConfirmations.every(function(mc){return mc.s==="Confirmed";});
+    if(!allConfirmed) return;
+    var instr = document.getElementById("detail-instructions");
+    p.bindingInstructions = instr ? instr.value : p.bindingInstructions;
+    p.status = "Bound";
+    p.premiumPaid = false;
+    var inv = "INV-"+(financeSeq++);
+    financeDocs.unshift({id:inv, type:"Invoice", program:p.id, counterparty:p.marketConfirmations.map(function(mc){return mc.m;}).join(", "), amount:Math.round(p.premium*(p.type==="Quota Share"?0.35:p.type==="Surplus"?0.55:1)), ccy:p.ccy, date:TODAY.toISOString().slice(0,10), co: p.coBroker ? (p.coBroker.name+" · "+p.coBroker.split+"%") : null});
+    renderProgramDetail(id); renderPlacements(); renderDashboard(); renderAccounting(); renderFinance();
+  };
+
+  // ---------- reports ----------
+  function renderReports(){
+    var lw=460, bh=26, gap=14, pad=90;
+    var rows = programs.map(function(p){ return {id:p.id, lr: p.earned ? (p.loss/p.earned*100) : 0}; });
+    var max = Math.max(100, Math.max.apply(null, rows.map(function(r){return r.lr;})));
+    var svg = '<svg viewBox="0 0 '+lw+' '+(rows.length*(bh+gap))+'" width="100%" height="'+(rows.length*(bh+gap))+'">';
+    rows.forEach(function(r,i){
+      var y = i*(bh+gap);
+      var w = (lw-pad-10) * Math.min(r.lr,max)/max;
+      var color = r.lr>90? "var(--bad)" : r.lr>70 ? "var(--warn)" : "var(--good)";
+      svg += '<text x="0" y="'+(y+bh/2+4)+'" font-size="11.5" fill="var(--ink)" font-family="IBM Plex Mono">'+r.id+'</text>';
+      svg += '<rect x="'+pad+'" y="'+y+'" width="'+(lw-pad-10)+'" height="'+bh+'" rx="5" fill="var(--surface-2)"></rect>';
+      svg += '<rect x="'+pad+'" y="'+y+'" width="'+Math.max(2,w)+'" height="'+bh+'" rx="5" fill="'+color+'"></rect>';
+      svg += '<text x="'+(pad+Math.max(2,w)+8)+'" y="'+(y+bh/2+4)+'" font-size="11.5" fill="var(--ink)" font-family="IBM Plex Mono">'+r.lr.toFixed(0)+'%</text>';
+    });
+    svg += '</svg>';
+    document.getElementById("chart-lr").innerHTML = svg;
+    document.getElementById("legend-lr") && (document.getElementById("legend-lr").innerHTML="");
+
+    var t = '<div class="table-wrap"><table><thead><tr><th>Reinsurer</th><th>Panel</th><th class="num">Committed capacity</th></tr></thead><tbody>';
+    var cap = {"Helvetia Continental Re":12400000,"Zenith Re · Syndicate 2044":9800000,"Andean Capacity Re":6100000,"Northbridge Reinsurance SE":15200000,"Comstock Re":4300000,"Baltic Shield Re":2600000,
+      "Nanyang Re":7400000,"Meridian Gulf Re":3900000,"Sequoia Continental Re":10800000,"Tyrrhenian Re":2100000,"Anatolia Re":900000,"Sahel Re":600000,
+      "Marlow Underwriting · Syndicate 1918":8600000,"Copperfield Re · Syndicate 3350":3200000,"Sextant Re · Syndicate 2711":5100000};
+    markets.forEach(function(m){ t += '<tr><td>'+m.name+'</td><td>'+m.panel+'</td><td class="num">'+fmt(cap[m.name]||0)+'</td></tr>'; });
+    t += '</tbody></table></div>';
+    document.getElementById("exposure-table").innerHTML = t;
+  }
+
+  // ---------- registry ----------
+  // Compact name+meta row list (rather than a wide <table>) so every category card
+  // reads cleanly at any width in the responsive registry grid, with no column overflow.
+  function regRow(name, meta, sideHtml){
+    return '<div class="reg-row"><div class="reg-main"><div class="reg-name">'+name+'</div><div class="reg-meta">'+meta+'</div></div>'+
+      (sideHtml ? '<div class="reg-side">'+sideHtml+'</div>' : '') + '</div>';
+  }
+  function renderRegistry(){
+    var t1 = '<div class="reg-list">' + cedants.map(function(c){
+      return regRow(c.name, c.country, statusPill(c.kyc==="Current"?"Bound":"Renewal Due"));
+    }).join("") + '</div>';
+    document.getElementById("cedant-table").innerHTML = t1;
+    document.getElementById("reg-count-cedant").textContent = "("+cedants.length+")";
+
+    var reinsurance = markets.filter(function(m){ return m.type==="Reinsurance"; });
+    var t2 = '<div class="reg-list">' + reinsurance.map(function(m){
+      return regRow(m.name, m.rating+' · '+m.panel);
+    }).join("") + '</div>';
+    document.getElementById("reinsurance-table").innerHTML = t2;
+    document.getElementById("reg-count-reinsurance").textContent = "("+reinsurance.length+")";
+
+    var syndicates = markets.filter(function(m){ return m.type==="Lloyds Syndicate"; });
+    var t3 = '<div class="reg-list">' + syndicates.map(function(m){
+      return regRow(m.name, m.rating+' · '+m.panel);
+    }).join("") + '</div>';
+    document.getElementById("syndicate-table").innerHTML = t3;
+    document.getElementById("reg-count-syndicate").textContent = "("+syndicates.length+")";
+
+    var t4 = '<div class="reg-list">' + brokers.map(function(b){
+      return regRow(b.name, b.country+' · '+b.role, statusPill(b.status));
+    }).join("") + '</div>';
+    document.getElementById("brokers-table").innerHTML = t4;
+    document.getElementById("reg-count-brokers").textContent = "("+brokers.length+")";
+
+    var t5 = '<div class="reg-list">' + others.map(function(o){
+      return regRow(o.name, o.country+' · '+o.role, statusPill(o.status));
+    }).join("") + '</div>';
+    document.getElementById("others-table").innerHTML = t5;
+    document.getElementById("reg-count-others").textContent = "("+others.length+")";
+  }
+
+  // ---------- cedant portal ----------
+  function renderCedant(){
+    var mine = programs.filter(function(p){ return p.cedant==="Meridian Mutual Insurance"; });
+    var body = document.getElementById("c-programs-body"); body.innerHTML="";
+    mine.forEach(function(p){
+      var tr = el("tr");
+      tr.innerHTML = '<td><strong>'+p.id+'</strong></td><td>'+p.cls+'</td><td><span class="type-badge '+typeClass(p.type)+'">'+p.type+'</span></td><td class="num">'+fmtFull(p.premium,p.ccy)+'</td><td>'+statusPill(p.status)+'</td><td>'+p.expiry+'</td>';
+      body.appendChild(tr);
+    });
+
+    var sel = document.getElementById("cb-program");
+    sel.innerHTML = mine.map(function(p){ return '<option>'+p.id+' · '+p.cls+'</option>'; }).join("");
+
+    renderPending();
+
+    var t = techAccount(mine[1] || mine[0]);
+    document.getElementById("c-statement-out").innerHTML =
+      row("Treaty premium ceded YTD", fmtFull(t.ceded)) +
+      row("Ceding commission earned", fmtFull(t.cedingComm)) +
+      row("Claims recovered YTD", fmtFull(t.claims)) +
+      row("Balance due from broker", fmtFull(t.cedingComm - 0));
+  }
+  function renderPending(){
+    var wrap = document.getElementById("c-pending");
+    if(!pendingSubmissions.length){ wrap.innerHTML = '<div class="empty">No open submissions — everything is placed.</div>'; return; }
+    wrap.innerHTML = pendingSubmissions.map(function(s){
+      return '<div style="display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line-soft); font-size:13px;"><span>'+s.cls+' · '+s.type+' · '+fmt(s.amount)+'</span>'+statusPill("Renewal Due")+'</div>';
+    }).join("");
+  }
+  window.submitCedantRisk = function(){
+    pendingSubmissions.unshift({cls:document.getElementById("cs-class").value, type:document.getElementById("cs-type").value, amount:+document.getElementById("cs-amount").value});
+    renderPending();
+  };
+  window.submitCedantBdx = function(){
+    var btn = event.target;
+    btn.textContent = "Submitted ✓"; btn.disabled = true;
+    setTimeout(function(){ btn.textContent="Submit bordereau"; btn.disabled=false; }, 1800);
+  };
+
+  // ---------- new submission wizard ----------
+  var wizStep = 0, wizData = {type:"Facultative", markets:{}};
+  window.openWizard = function(){ wizStep=0; wizData={type:"Facultative", markets:{}}; document.getElementById("wizard-backdrop").hidden=false; paintWizard(); };
+  window.closeWizard = function(){ document.getElementById("wizard-backdrop").hidden=true; };
+  var stepLabels = ["Risk basics","Structure & terms","Market panel","Review & bind"];
+
+  function paintWizard(){
+    document.getElementById("wizard-step-label").textContent = "Step "+(wizStep+1)+" of 4 · "+stepLabels[wizStep];
+    document.querySelectorAll(".step-dots span").forEach(function(d,i){ d.classList.toggle("active", i<=wizStep); });
+    document.getElementById("wizard-back").disabled = wizStep===0;
+    document.getElementById("wizard-next").textContent = wizStep===3 ? "Issue Slip" : "Continue";
+    var body = document.getElementById("wizard-body");
+
+    if(wizStep===0){
+      body.innerHTML =
+        '<div class="field"><label>Cedant</label><select id="w-cedant">'+cedants.map(function(c){return '<option>'+c.name+'</option>';}).join("")+'</select></div>'+
+        '<div class="field-row"><div class="field"><label>Class of business</label><select id="w-class"><option>Property</option><option>Casualty</option><option>Marine</option><option>Motor</option></select></div>'+
+        '<div class="field"><label>Type</label><select id="w-type"><option>Facultative</option><option>Quota Share</option><option>Surplus</option><option>Excess of Loss</option></select></div></div>'+
+        '<div class="field"><label>Underwriting year</label><input type="text" id="w-uwy" value="2026"></div>';
+    }
+    if(wizStep===1){
+      var type = wizData.type;
+      var html = '';
+      if(type==="Facultative"){
+        html = '<div class="field"><label>Insured</label><input type="text" id="w-insured" value="Northline Terminals Ltd."></div>'+
+          '<div class="field-row"><div class="field"><label>Sum insured</label><input type="number" id="w-si" value="12000000"></div><div class="field"><label>Rate %</label><input type="number" id="w-rate" value="0.85" step="0.05"></div></div>';
+      } else if(type==="Quota Share"){
+        html = '<div class="field-row"><div class="field"><label>Cession %</label><input type="number" id="w-cession" value="30"></div><div class="field"><label>Commission %</label><input type="number" id="w-comm" value="27"></div></div>'+
+          '<div class="field"><label>Estimated GNPI</label><input type="number" id="w-gnpi" value="9000000"></div>';
+      } else if(type==="Surplus"){
+        html = '<div class="field-row"><div class="field"><label>Retention</label><input type="number" id="w-ret" value="750000"></div><div class="field"><label>Lines</label><input type="number" id="w-lines" value="8"></div></div>';
+      } else {
+        html = '<div class="field-row"><div class="field"><label>Retention</label><input type="number" id="w-xret" value="5000000"></div><div class="field"><label>Limit</label><input type="number" id="w-xlimit" value="15000000"></div></div>'+
+          '<div class="field-row"><div class="field"><label>Rate on line %</label><input type="number" id="w-xrol" value="5.5" step="0.1"></div><div class="field"><label>Reinstatements</label><input type="text" id="w-reinst" value="2 @ 100% pro-rata"></div></div>';
+      }
+      body.innerHTML = html + '<div class="hint">Fields shown are conditional on the type chosen in step 1.</div>';
+    }
+    if(wizStep===2){
+      var total = markets.reduce(function(s,m){ return s + (wizData.markets[m.name]||0); },0);
+      var html = markets.map(function(m,i){
+        var v = wizData.markets[m.name] || (i<3 ? [40,35,25][i] : 0);
+        wizData.markets[m.name] = v;
+        return '<div class="market-row"><div><div class="m-name">'+m.name+'</div><div class="m-rating">'+m.rating+' · '+m.panel+'</div></div><input type="number" data-m="'+m.name+'" value="'+v+'" min="0" max="100"><span style="width:14px;">%</span></div>';
+      }).join("");
+      body.innerHTML = '<div class="panel-sub" style="margin-bottom:10px;">Enter each market\'s signed line — binding needs 100%.</div>'+html+
+        '<div class="calc-out" style="margin-top:14px;"><div class="row"><span>Total signed</span><span id="w-total">'+total+'%</span></div></div>';
+      body.querySelectorAll("input").forEach(function(inp){
+        inp.addEventListener("input", function(){
+          wizData.markets[inp.dataset.m] = +inp.value||0;
+          var t = Object.values(wizData.markets).reduce(function(a,b){return a+b;},0);
+          document.getElementById("w-total").textContent = t+"%";
+          document.getElementById("w-total").parentElement.style.color = t===100 ? "var(--good)" : (t>100 ? "var(--bad)" : "var(--warn)");
+        });
+      });
+    }
+    if(wizStep===3){
+      var t = Object.values(wizData.markets).reduce(function(a,b){return a+b;},0);
+      body.innerHTML =
+        '<div class="banner">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3L15.5 9.5"/></svg>'+
+        'Cedant '+(wizData.cedant||"Meridian Mutual Insurance")+' · '+(wizData.cls||"Property")+' · '+wizData.type+' · '+t+'% targeted lines. Issuing the slip sends it to every named market for confirmation — binding happens once they confirm and the cedant approves.'+
+        '</div>'+
+        row("Cedant", wizData.cedant||"Meridian Mutual Insurance") + row("Class", wizData.cls||"Property") + row("Type", wizData.type) + row("Targeted capacity", t+"%");
+    }
+  }
+
+  document.getElementById("wizard-body").addEventListener("change", function(e){
+    if(e.target.id==="w-cedant") wizData.cedant = e.target.value;
+    if(e.target.id==="w-class") wizData.cls = e.target.value;
+    if(e.target.id==="w-type") wizData.type = e.target.value;
+  });
+
+  window.wizardNext = function(){
+    if(wizStep===0){
+      wizData.cedant = document.getElementById("w-cedant").value;
+      wizData.cls = document.getElementById("w-class").value;
+      wizData.type = document.getElementById("w-type").value;
+    }
+    if(wizStep<3){ wizStep++; paintWizard(); return; }
+    // issue slip — enters the tracked lifecycle rather than binding immediately
+    var id = "P-"+(progSeq++);
+    var structureMap = {
+      "Facultative": "Single risk · "+fmt(+((document.getElementById("w-si")||{}).value||8000000))+" SI",
+      "Quota Share": (wizData.cession||30)+"% cession",
+      "Surplus": "Surplus, "+(document.getElementById("w-lines")?document.getElementById("w-lines").value:8)+" lines",
+      "Excess of Loss": "XL layer, "+(document.getElementById("w-xrol")?document.getElementById("w-xrol").value:5)+"% ROL"
+    };
+    var mcs = Object.keys(wizData.markets).filter(function(m){return wizData.markets[m]>0;}).map(function(m){ return {m:m, s:"Sent"}; });
+    programs.unshift({id:id, cedant:wizData.cedant||"Meridian Mutual Insurance", cls:wizData.cls||"Property", type:wizData.type, structure: structureMap[wizData.type], premium: 1500000+Math.floor(Math.random()*4000000), ccy:"USD", status:"Issue Slip", expiry:"2027-06-01", loss:0, earned:0,
+      premiumPaid:false, coBroker:null, bindingInstructions:"",
+      marketConfirmations: mcs.length?mcs:[{m:"Northbridge Reinsurance SE",s:"Sent"}],
+      documents:[{name:"Slip v1 — issued.pdf", from:"Broker", date:TODAY.toISOString().slice(0,10), type:"Slip"}]});
+    closeWizard();
+    showView("placements");
+    renderPlacements();
+    renderDashboard();
+    renderAccounting();
+    openProgramDetail(id);
+  };
+  window.wizardBack = function(){ if(wizStep>0){ wizStep--; paintWizard(); } };
+
+  // ---------- theme toggle sync (system default, no manual control needed) ----------
+
+  // ---------- init ----------
+  renderRenewals();
+  renderDashboard();
+  renderPlacements();
+  renderLayers();
+  computeQS();
+  computeSurplus();
+  computeReinstatement();
+  renderBdx();
+  renderClaims();
+  renderAccounting();
+  renderFinance();
+  renderReports();
+  renderRegistry();
+  renderCedant();
+})();
+</script>

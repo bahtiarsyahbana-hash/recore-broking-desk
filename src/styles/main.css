@@ -1,0 +1,25 @@
+/* ==========================================================================
+   ReCore Broking Desk — stylesheet entry point.
+
+   Layers are imported in cascade order: tokens first (nothing may depend on
+   an undefined variable), then element defaults, then the app shell, then
+   components, then the responsive overrides last so they win.
+   ========================================================================== */
+
+@import url("tokens.css");
+@import url("base.css");
+@import url("layout.css");
+
+@import url("components/buttons.css");
+@import url("components/cards.css");
+@import url("components/tables.css");
+@import url("components/pills.css");
+@import url("components/forms.css");
+@import url("components/tabs.css");
+@import url("components/tower.css");
+@import url("components/modal.css");
+@import url("components/banner.css");
+@import url("components/lifecycle.css");
+@import url("components/misc.css");
+
+@import url("responsive.css");

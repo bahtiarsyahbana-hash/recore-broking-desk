@@ -1,0 +1,14 @@
+/* Responsive overrides — narrow viewports collapse the shell to a single column. */
+@media (max-width:860px){
+  .app{ grid-template-columns:1fr; }
+  .sidebar{ position:static; height:auto; flex-direction:row; overflow-x:auto; }
+  .brand{ display:none; }
+  .nav{ flex-direction:row; padding:8px; }
+  .nav-label{ display:none; }
+  .nav-item{ white-space:nowrap; }
+  .sidebar-foot{ display:none; }
+  .grid-kpi{ grid-template-columns:1fr 1fr; }
+  .cols-2{ grid-template-columns:1fr; }
+  .field-row,.field-row3{ grid-template-columns:1fr; }
+  .view{ padding:16px 16px 50px; }
+}

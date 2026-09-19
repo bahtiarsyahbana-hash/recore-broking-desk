@@ -1,0 +1,133 @@
+/* Lifecycle stepper, confirmation rows, document dropbox and finance doc badges. */
+/* ---- journey rail -------------------------------------------------
+   Five numbered steps. Done carries a tick, the current one is filled,
+   the rest stay outlined, so the distance still to travel is legible
+   rather than implied by a colour bar. ------------------------------ */
+.journey{
+  display:flex; list-style:none; margin:0 0 18px; padding:0; gap:0;
+  counter-reset:journey;
+}
+.journey-step{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:6px;
+  position:relative; text-align:center; min-width:0;
+}
+/* Connector, drawn between markers rather than under the labels. */
+.journey-step::before{
+  content:''; position:absolute; top:11px; left:-50%; right:50%;
+  height:2px; background:var(--line);
+}
+.journey-step:first-child::before{ display:none; }
+.journey-step.done::before,
+.journey-step.current::before{ background:var(--good); }
+
+.journey-marker{
+  width:23px; height:23px; border-radius:50%; flex:none; position:relative; z-index:1;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; font-family:'IBM Plex Mono',monospace;
+  background:var(--surface); border:2px solid var(--line); color:var(--ink-soft);
+}
+.journey-step.done .journey-marker{ background:var(--good); border-color:var(--good); color:#fff; }
+.journey-step.current .journey-marker{ background:var(--marine); border-color:var(--marine); color:#fff; }
+
+.journey-label{ font-size:10.5px; line-height:1.3; color:var(--ink-soft); }
+.journey-step.current .journey-label{ color:var(--ink); font-weight:700; }
+.journey-step.done .journey-label{ color:var(--ink-soft); }
+
+/* ---- next action --------------------------------------------------
+   The one thing to do now, stated in words, with its button attached.
+   Deliberately the loudest element in the drawer. ------------------- */
+.next-action{
+  border:1px solid var(--marine); border-left-width:3px; border-radius:var(--radius);
+  background:var(--marine-tint); padding:14px 16px;
+}
+.next-action.blocked{ border-color:var(--bad); background:var(--bad-tint); }
+.next-action.done{ border-color:var(--good); background:var(--good-tint); }
+.next-action-kicker{
+  display:flex; align-items:center; gap:6px;
+  font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--marine); margin-bottom:5px;
+}
+.next-action.blocked .next-action-kicker{ color:var(--bad); }
+.next-action.done .next-action-kicker{ color:var(--good); }
+.next-action-kicker svg{ width:13px; height:13px; flex:none; }
+.next-action h4{
+  font-family:'Fraunces',Georgia,serif; font-size:16px; font-weight:600;
+  margin:0 0 4px; color:var(--ink);
+}
+.next-action p{ margin:0; font-size:12.5px; color:var(--ink-soft); max-width:62ch; }
+.next-action-btn{ margin-top:12px; }
+.next-action-block{
+  display:flex; gap:7px; align-items:flex-start; margin-top:10px;
+  font-size:12px; font-weight:600; color:var(--bad);
+}
+.next-action-block svg{ width:14px; height:14px; flex:none; margin-top:1px; }
+.next-action .field{ max-width:none; }
+.next-action textarea{ background:var(--surface); }
+.optional-tag{
+  font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--ink-soft); background:var(--surface-2); padding:1px 6px; border-radius:20px;
+  margin-left:5px;
+}
+
+/* ---- bind checklist ---------------------------------------------- */
+.checklist{ list-style:none; margin:0; padding:0; }
+.check-item{
+  display:flex; gap:9px; align-items:flex-start;
+  padding:8px 0; border-bottom:1px solid var(--line-soft); font-size:12.5px;
+}
+.check-item:last-child{ border-bottom:none; }
+.check-glyph{
+  width:17px; height:17px; border-radius:50%; flex:none; margin-top:1px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:700; background:var(--surface-2); color:var(--ink-soft);
+}
+.check-item.done .check-glyph{ background:var(--good-tint); color:var(--good); }
+.check-item.blocking .check-glyph{ background:var(--bad-tint); color:var(--bad); }
+.check-text{ display:flex; flex-direction:column; min-width:0; }
+.check-label{ font-weight:600; color:var(--ink); }
+.check-item.todo .check-label,
+.check-item.optional .check-label{ color:var(--ink-soft); font-weight:500; }
+.check-detail{ font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
+.check-item.blocking .check-detail{ color:var(--bad); font-weight:600; }
+
+/* ---- confirmation progress --------------------------------------- */
+.confirm-progress{ margin-bottom:10px; }
+.confirm-bar{
+  height:5px; border-radius:3px; background:var(--surface-2); overflow:hidden;
+}
+.confirm-bar span{ display:block; height:100%; background:var(--good); border-radius:3px;
+  transition:width .25s ease; }
+.confirm-count{ font-size:11.5px; color:var(--ink-soft); margin-top:5px; }
+.confirm-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line-soft); font-size:13px; }
+.doc-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line-soft); font-size:12.5px; background:var(--surface-2); border-radius:6px; margin-bottom:6px; }
+.doc-row .d-name{ font-weight:600; }
+.doc-row .d-meta{ color:var(--ink-soft); font-size:11.5px; }
+.fin-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; }
+.fin-badge.Invoice{ background:var(--info-tint); color:var(--info); }
+.fin-badge.Credit-Note{ background:var(--good-tint); color:var(--good); }
+.fin-badge.Debit-Note{ background:var(--warn-tint); color:var(--warn); }
+
+.next-action-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.next-action-actions .btn{ margin-top:0; }
+.next-action-secondary{ background:var(--surface); }
+.signed-line{
+  font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft);
+  background:var(--surface-2); padding:1px 6px; border-radius:5px; margin-left:5px;
+}
+.prov-who{ font-size:12px; color:var(--ink-soft); }
+
+/* Editable signed lines, shown only while the slip is a draft. */
+.line-edit{ display:flex; align-items:center; gap:4px; flex:none; }
+.line-edit input{ width:62px; text-align:right; padding:5px 7px; font-size:12.5px; }
+.line-pct{ font-size:12px; color:var(--ink-soft); }
+.line-remove{ padding:4px 7px; color:var(--ink-soft); font-size:12px; }
+.line-remove:hover{ color:var(--bad); background:var(--bad-tint); }
+
+/* An administrator self-approval is legitimate but exceptional, so it is
+   marked on the record rather than looking like a witnessed release. */
+.override-note{
+  display:flex; gap:7px; align-items:flex-start; margin-top:10px; padding:9px 11px;
+  border-radius:8px; background:var(--warn-tint); color:var(--warn);
+  font-size:11.5px; font-weight:600;
+}
+.override-note svg{ width:14px; height:14px; flex:none; margin-top:1px; }

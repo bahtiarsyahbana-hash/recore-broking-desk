@@ -1,0 +1,13 @@
+/* Status pills and placement type badges. */
+.pill{ display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+.pill.good{ background:var(--good-tint); color:var(--good); }
+.pill.warn{ background:var(--warn-tint); color:var(--warn); }
+.pill.bad{ background:var(--bad-tint); color:var(--bad); }
+.pill.info{ background:var(--info-tint); color:var(--info); }
+.pill.neutral{ background:var(--surface-2); color:var(--ink-soft); }
+.pill::before{ content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.type-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.02em; }
+.type-badge.fac{ background:var(--info-tint); color:var(--info); }
+.type-badge.qs{ background:var(--marine-tint); color:var(--marine-ink); }
+.type-badge.surplus{ background:var(--brass-tint); color:var(--brass); }
+.type-badge.xol{ background:var(--warn-tint); color:var(--warn); }

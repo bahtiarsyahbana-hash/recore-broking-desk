@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReCore Broking Desk</title>
+<meta name="description" content="Interactive prototype of a reinsurance broker core system — facultative and treaty placement, quota share, surplus and excess-of-loss calculators, bordereaux, claims and accounting, plus an optional cedant portal.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<!--
+  Application shell only. Everything below #view-root and #modal-root is rendered
+  by JavaScript: the sidebar from core/navigation.js, the active view from its own
+  module under js/views/, and overlays from js/ui/.
+-->
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">R</div>
+      <div>
+        <div class="name">ReCore</div>
+        <div class="sub">Meridian Bridge Re Brokers</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav-broker"></nav>
+    <nav class="nav" id="nav-cedant" hidden></nav>
+    <div class="sidebar-foot" id="sidebar-foot"></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="roleswitch">
+        <button id="role-broker" class="active">Broker Desk</button>
+        <button id="role-cedant">Cedant Portal</button>
+      </div>
+      <span class="chip" id="cedant-flag-chip" hidden>optional module · limited access</span>
+      <div class="spacer"></div>
+      <span class="chip" id="chip-uwy"></span>
+      <span class="chip" id="chip-ccy"></span>
+      <!-- Which seat at the broker desk is acting. Slip release is four-eyes,
+           so this is a real control, not a display preference. -->
+      <label class="seat" id="seat-switch">
+        <span class="seat-caption">Acting as</span>
+        <select id="seat-select"></select>
+      </label>
+      <div class="avatar" id="avatar"></div>
+    </header>
+
+    <!-- The active view module renders here. -->
+    <main id="view-root"></main>
+  </div>
+</div>
+
+<!-- Overlays (submission wizard, program lifecycle drawer) mount here. -->
+<div id="modal-root"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

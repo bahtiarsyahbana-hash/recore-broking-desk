@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node — the app has no dependencies, but keep these out if any are ever added
+node_modules/
+npm-debug.log*
+*.tsbuildinfo
+
+# Local environment
+.env
+.env.local

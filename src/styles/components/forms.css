@@ -1,0 +1,61 @@
+/* Toolbars, segmented filters, form controls and calculation output blocks. */
+.toolbar{ display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.seg{ display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.seg button{ border:none; background:var(--surface); padding:7px 12px; font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; border-right:1px solid var(--line); }
+.seg button:last-child{ border-right:none; }
+.seg button.active{ background:var(--marine); color:#fff; }
+input[type=text],input[type=number],select,textarea{
+  font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:8px 10px; border-radius:7px; border:1px solid var(--line);
+  background:var(--surface); color:var(--ink); width:100%;
+}
+input[type=number]{ font-family:'IBM Plex Mono',monospace; }
+label{ font-size:12px; font-weight:600; color:var(--ink-soft); display:block; margin-bottom:4px; }
+.field{ margin-bottom:12px; }
+.field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.field-row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.hint{ font-size:11.5px; color:var(--ink-soft); margin-top:3px; }
+
+.calc-out{ background:var(--surface-2); border-radius:8px; padding:14px 16px; }
+.calc-out .row{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+.calc-out .row:last-child{ border-bottom:none; padding-top:10px; margin-top:2px; border-top:1px solid var(--line); font-weight:700; }
+.calc-out .row span:last-child{ font-family:'IBM Plex Mono',monospace; }
+
+
+/* Validation state. A rejected field keeps what was typed and says why. */
+.field .req{ color:var(--bad); }
+.field-error{ font-size:11.5px; color:var(--bad); margin-top:4px; }
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea{ border-color:var(--bad); background:var(--bad-tint); }
+.field.has-error label{ color:var(--bad); }
+
+/* Collapsible optional sections. Required fields stay above them, always
+   visible, so a form is never a wall of boxes on first sight. */
+.form-section{ border:1px solid var(--line); border-radius:8px; margin-bottom:10px; background:var(--surface); }
+.form-section > summary{
+  cursor:pointer; padding:10px 12px; font-size:12.5px; font-weight:600; color:var(--ink);
+  display:flex; align-items:center; justify-content:space-between; gap:8px; list-style:none;
+}
+.form-section > summary::-webkit-details-marker{ display:none; }
+/* CSS-drawn chevron — a rotated border corner, so it renders the same
+   everywhere rather than depending on a glyph the font may not carry. */
+.form-section > summary::before{
+  content:''; width:6px; height:6px; flex:none; margin:0 9px 2px 2px;
+  border-right:1.6px solid var(--ink-soft); border-bottom:1.6px solid var(--ink-soft);
+  transform:rotate(-45deg); transition:transform .15s ease;
+}
+.form-section[open] > summary::before{ transform:rotate(45deg); margin-bottom:4px; }
+.form-section > summary:hover{ background:var(--surface-2); border-radius:8px; }
+.form-section > summary span:first-of-type{ flex:1; }
+.form-section-note{ font-size:11px; font-weight:500; color:var(--ink-soft); }
+.form-section-body{ padding:4px 12px 12px; border-top:1px solid var(--line-soft); }
+.form-section-body .field:last-child{ margin-bottom:0; }
+
+/* Count badge inside a segmented filter — e.g. submissions awaiting approval. */
+.seg button{ display:inline-flex; align-items:center; gap:6px; }
+.seg-badge{
+  display:inline-flex; align-items:center; justify-content:center; min-width:17px; height:17px;
+  padding:0 5px; border-radius:20px; font-size:10.5px; font-weight:700;
+  background:var(--warn-tint); color:var(--warn);
+}
+.seg button.active .seg-badge{ background:rgba(255,255,255,.22); color:#fff; }

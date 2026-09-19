@@ -1,0 +1,32 @@
+/* XoL layer editor rows and the tower visualisation. */
+.layer-row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:8px; align-items:end; margin-bottom:10px; }
+.tower{ display:block; min-width:0; color:var(--ink); font-family:'IBM Plex Sans',sans-serif; }
+.tower .mono{ font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; }
+.tower-heading{ display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; font-size:11px; color:var(--ink-soft); }
+.tower-status,.tower-empty{ margin:10px 0 18px; padding:9px 10px; border:1px solid var(--line); border-radius:var(--radius); font-size:12px; }
+.tower-status--good{ color:var(--good); background:var(--good-tint); }
+.tower-status--issue{ color:var(--bad); background:var(--bad-tint); }
+.tower-empty{ color:var(--ink-soft); background:var(--surface-2); }
+.tower-chart{ display:flex; height:292px; padding-top:22px; }
+.tower-axis{ position:relative; flex:0 0 88px; border-right:1px solid var(--line); }
+.tower-tick{ position:absolute; left:0; right:0; border-top:1px solid var(--line); }
+.tower-tick span{ position:absolute; right:8px; transform:translateY(-50%); font-size:10px; white-space:nowrap; background:var(--surface); }
+.tower-plot-scroll{ flex:1; min-width:0; overflow-x:auto; padding-top:22px; margin-top:-22px; }
+.tower-plot{ height:100%; min-width:calc(var(--tower-tracks) * 28px); position:relative; background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box; }
+.tower-tracks{ position:absolute; inset:0; display:grid; grid-template-columns:repeat(var(--tower-tracks),minmax(0,1fr)); gap:4px; padding:0 4px; }
+.tower-track{ position:relative; border-right:1px solid var(--line-soft); }
+.tower-track-label{ position:absolute; top:-20px; width:100%; text-align:center; font-size:10px; color:var(--ink-soft); }
+.tower-band{ position:absolute; width:100%; background:var(--tower-color); outline:1px solid var(--surface); outline-offset:-1px; }
+.tower-retention{ position:absolute; bottom:0; width:100%; background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 6px,var(--line) 6px,var(--line) 12px); }
+.tower-issue-band{ position:absolute; width:100%; background:var(--bad-tint); border-top:1px dashed var(--bad); border-bottom:1px dashed var(--bad); box-sizing:border-box; }
+.tower-issue-band--overlap{ background:var(--warn-tint); border-color:var(--warn); }
+.tower-retention-key{ font-size:11px; color:var(--ink-soft); margin:16px 0 12px; overflow-wrap:anywhere; }
+.tower-issues{ margin:0 0 14px; padding:10px 10px 10px 25px; background:var(--bad-tint); color:var(--bad); border-radius:var(--radius); font-size:11px; overflow-wrap:anywhere; }
+.tower-issues li+li{ margin-top:6px; }
+.tower-details{ list-style:none; padding:0; margin:0; border-top:1px solid var(--line); }
+.tower-detail{ padding:10px 0 10px 10px; margin-top:8px; border-left:3px solid var(--tower-color); border-bottom:1px solid var(--line-soft); font-size:12px; overflow-wrap:anywhere; }
+.tower-detail>div:first-child,.tower-detail-metrics{ display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; }
+.tower-terms,.tower-range,.tower-detail-metrics{ color:var(--ink-soft); font-size:11px; }
+.tower-detail-metrics{ margin-top:6px; }
+.tower-detail-metrics b{ font-weight:500; color:var(--ink); }
+.tower-range{ display:block; margin-top:5px; font-size:10px; }

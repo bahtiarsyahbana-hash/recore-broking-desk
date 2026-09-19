@@ -1,0 +1,13 @@
+/* Resets, document defaults and typography. */
+*,*::before,*::after{ box-sizing:border-box; }
+[hidden]{ display:none !important; }
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{ font-family:'Fraunces',Georgia,serif; text-wrap:balance; margin:0; }
+.mono, .num, input[type=number], input[type=text].mono, td.num, .kpi-value{ font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+a{ color:var(--marine); }
+button{ font-family:inherit; }
+::selection{ background:var(--marine); color:#fff; }

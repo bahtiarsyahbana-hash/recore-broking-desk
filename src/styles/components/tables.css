@@ -1,0 +1,29 @@
+/* Data tables and the compact registry row list. */
+table{ width:100%; border-collapse:collapse; font-size:13px; }
+thead th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+tbody td{ padding:10px 10px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+tbody tr:hover{ background:var(--surface-2); }
+td.num, th.num{ text-align:right; }
+.table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow); }
+.table-wrap table{ min-width:640px; }
+.table-wrap.compact table{ min-width:0; width:100%; }
+.table-wrap.compact th, .table-wrap.compact td{ white-space:nowrap; }
+.reg-list{ border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow); overflow:hidden; }
+.reg-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); }
+.reg-row:last-child{ border-bottom:none; }
+.reg-main{ flex:1; min-width:0; }
+.reg-name{ font-weight:600; font-size:13px; }
+.reg-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+.reg-side{ flex-shrink:0; text-align:right; }
+
+/* A registry category page: the row list reads as a column, not a full-width
+   band, so the name and its status stay visually paired on a wide screen. */
+.reg-page{ max-width:760px; }
+
+/* Contact line and regulatory code beneath a registry entry. */
+.reg-contact{ font-size:11.5px; color:var(--ink-soft); margin-top:3px; }
+.reg-contact .pic{ font-weight:600; color:var(--ink); }
+.reg-contact a{ color:var(--marine); text-decoration:none; }
+.reg-contact a:hover{ text-decoration:underline; }
+.reg-code{ display:inline-block; font-size:10.5px; color:var(--ink-soft); background:var(--surface-2);
+  padding:2px 7px; border-radius:5px; margin-top:4px; }

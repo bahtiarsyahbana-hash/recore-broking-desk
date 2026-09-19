@@ -1,0 +1,38 @@
+/* Cards, KPI tiles, column grids and panel headings. */
+.grid-kpi{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+.card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow); }
+.kpi-label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
+.kpi-value{ font-size:24px; font-weight:600; margin-top:6px; }
+.kpi-delta{ font-size:12px; margin-top:4px; display:flex; align-items:center; gap:4px; }
+.kpi-delta.up{ color:var(--good); } .kpi-delta.down{ color:var(--bad); }
+
+.cols-2{ display:grid; grid-template-columns:1.4fr 1fr; gap:16px; align-items:start; }
+.cols-registry{ display:grid; grid-template-columns:repeat(auto-fit, minmax(320px,1fr)); gap:16px; align-items:start; }
+.panel-title{ font-size:13.5px; font-weight:700; margin-bottom:2px; }
+.panel-title .count{ font-weight:500; color:var(--ink-soft); font-size:12px; }
+.panel-sub{ font-size:12px; color:var(--ink-soft); margin-bottom:12px; }
+.reg-badge{ display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.3px; padding:2px 7px; border-radius:20px; background:var(--surface-2); color:var(--ink-soft); }
+
+/* Submission summary — the review step, read top to bottom before saving. */
+.summary{ display:flex; flex-direction:column; gap:14px; }
+.summary-section{ border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+.summary-head{
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--ink-soft); background:var(--surface-2); padding:8px 13px;
+  border-bottom:1px solid var(--line);
+}
+.summary-row{
+  display:flex; justify-content:space-between; align-items:baseline; gap:14px;
+  padding:8px 13px; font-size:13px; border-bottom:1px solid var(--line-soft);
+}
+.summary-row:last-child{ border-bottom:none; }
+.summary-row > span:first-child{ color:var(--ink-soft); flex:none; }
+.summary-row > span:last-child{
+  text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;
+  word-break:break-word;
+}
+.summary-row.emphasis{ font-weight:700; background:var(--surface-2); }
+.summary-row.emphasis > span:first-child{ color:var(--ink); }
+.summary-row.good > span:last-child{ color:var(--good); }
+.summary-row.bad > span:last-child{ color:var(--bad); }
+.summary-row .muted{ color:var(--ink-soft); font-style:italic; }

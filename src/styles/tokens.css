@@ -1,0 +1,32 @@
+/* Design tokens — colour, type, elevation. The single source of truth for theming.
+   Light is the fixed default; the dark palette stays available behind data-theme="dark". */
+:root{
+  --ink:#10192b; --ink-soft:#3a4457;
+  --bg:#ffffff; --surface:#ffffff; --surface-2:#f3f4f6;
+  --line:rgba(16,25,43,.12); --line-soft:rgba(16,25,43,.07);
+  --marine:#1f6f78; --marine-ink:#123f45; --marine-tint:#e2eeee;
+  --brass:#a97a2f; --brass-tint:#f3e6cd;
+  --good:#1e7a4c; --good-tint:#e2f1e7;
+  --warn:#b1701c; --warn-tint:#f7ecd8;
+  --bad:#a83a3a; --bad-tint:#f6e3e1;
+  --info:#3a5f8a; --info-tint:#e5ecf5;
+  --shadow: 0 1px 2px rgba(16,25,43,.05), 0 6px 20px -10px rgba(16,25,43,.14);
+  --radius: 10px;
+  color-scheme: light;
+}
+/* Bright/white theme is the fixed default for presentation and daily-use consistency —
+   it no longer follows the OS's prefers-color-scheme. The dark palette below stays
+   available behind an explicit data-theme="dark" attribute if a manual toggle is added later. */
+:root[data-theme="dark"]{
+  --ink:#e9e6db; --ink-soft:#aab1c2;
+  --bg:#0c1220; --surface:#131b2c; --surface-2:#1a2338;
+  --line:rgba(233,230,219,.14); --line-soft:rgba(233,230,219,.08);
+  --marine:#4fb3ba; --marine-ink:#bfe7e9; --marine-tint:#12313a;
+  --brass:#d9a354; --brass-tint:#332510;
+  --good:#4fbf82; --good-tint:#123522;
+  --warn:#e0a13f; --warn-tint:#3a2b10;
+  --bad:#e2827c; --bad-tint:#3a1c1c;
+  --info:#8fb0d8; --info-tint:#1a2740;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -10px rgba(0,0,0,.6);
+  color-scheme: dark;
+}
