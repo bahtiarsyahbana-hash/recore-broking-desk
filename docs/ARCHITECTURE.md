@@ -52,7 +52,7 @@ them.
 | `format.js` | Money, percentage and date formatting — the only place values are formatted |
 | `dom.js` | `$`, `el`, `row`, `mount`, `onAction` (delegated clicks), `onInput`, `numVal` |
 | `events.js` | Pub/sub bus and the `TOPICS` a service may publish |
-| `store.js` | Live mutable state, the counterparty registry, and document-numbering sequences |
+| `store.js` | Live mutable state, the signed-in session, the counterparty registry, and document-numbering sequences |
 | `navigation.js` | The nav registry — one entry per module, per role |
 | `router.js` | Renders the sidebar, swaps views, owns the role switch |
 
@@ -74,8 +74,14 @@ where the business is, and it is the layer worth unit-testing first.
   `stepIndexFor(status)` is the single source of truth for position.
 - `portfolio.js` — book-level analytics: totals, premium by class, loss ratios,
   renewals due
+- `session.js` — sign-in. **Not security**: a client-side string match against
+  credentials that ship in the browser and are printed on the sign-in screen.
+  Replacing it with real auth means swapping this module and deleting
+  `data/users.data.js`; no view reads either directly.
 - `authority.js` — who is at the desk and what they may release, including the
-  four-eyes rule that a preparer may not approve their own submission
+  four-eyes rule that a preparer may not approve their own submission. Authority
+  now travels with the signed-in user, derived from the same records, rather
+  than being declared separately
 - `slip-approval.js` — the release gate: signed lines at 100%, cedant KYC
   current, panel named, second authorised person
 - `placement-terms.js` — what a submission's terms imply: the structure line as
@@ -266,6 +272,10 @@ them behind their back would make every confirmation meaningless.
   `1_500_000 + Math.random() * 4_000_000` regardless of the terms. It is now
   priced by `estimatedGrossPremium`, and a submission that cannot price itself
   carries nothing rather than a fabricated figure.
+- **Password, email, tel and date inputs were unstyled.** The CSS selector
+  listed only `text` and `number`, so those controls fell back to native
+  browser styling — visibly a different size and shape from the fields beside
+  them, on the sign-in form and throughout the registry forms.
 - **Four-eyes could deadlock a placement.** With one authorised signatory, a
   slip that signatory prepared was unreleasable by anyone, forever. Fixed by
   adding a second signatory, and by naming the eligible approvers wherever the

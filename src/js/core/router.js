@@ -7,10 +7,9 @@
  * another view.
  */
 import { $, $$, mount } from "./dom.js";
-import { state, currentUser } from "./store.js";
+import { state, currentUser, currentPortal } from "./store.js";
 import { emit, TOPICS } from "./events.js";
 import { roleChrome, ROLES } from "./navigation.js";
-import { DESK_USERS } from "../domain/authority.js";
 import { UNDERWRITING_YEAR, BASE_CURRENCY } from "./config.js";
 
 const views = new Map();
@@ -28,7 +27,7 @@ export const activeView = () => currentView;
 function renderNav(container, entries) {
   container.innerHTML = entries.map((entry) =>
     entry.section
-      ? `<div class="nav-label">${entry.section}</div>`
+      ? `<div class="nav-label">${typeof entry.section === "function" ? entry.section() : entry.section}</div>`
       : `<button class="nav-item" data-view="${entry.view}">${entry.icon}${entry.label}</button>`
   ).join("");
 }
@@ -53,26 +52,36 @@ export function refreshActiveView() {
 }
 
 /**
- * Switch between the broker desk and the cedant portal. The portal is an
- * optional, restricted module: switching role changes the navigation, the
- * chrome and the landing view together.
+ * Open the workspace the signed-in account belongs to.
+ *
+ * There is no role toggle any more: a broker cannot step into the cedant
+ * portal, and a cedant sees only their own book. That is what the portal's own
+ * banner has always claimed, and now the app enforces it.
  */
-export function setRole(role) {
-  state.role = role;
-  const isCedant = role === ROLES.CEDANT;
-  const chrome = roleChrome[role];
+export function openWorkspace() {
+  const user = currentUser();
+  const portal = currentPortal();
+  const isCedant = portal === ROLES.CEDANT;
+  const chrome = roleChrome[portal];
 
-  $("#role-broker").classList.toggle("active", !isCedant);
-  $("#role-cedant").classList.toggle("active", isCedant);
+  // The sidebar is built at boot, before anyone has signed in, so its headings
+  // are re-rendered here now that we know who this is.
+  renderNav($("#nav-broker"), roleChrome[ROLES.BROKER].nav);
+  renderNav($("#nav-cedant"), roleChrome[ROLES.CEDANT].nav);
+
+  $("#workspace-label").textContent = isCedant ? "Cedant Portal" : "Broker Desk";
   $("#nav-broker").hidden = isCedant;
   $("#nav-cedant").hidden = !isCedant;
   $("#cedant-flag-chip").hidden = !isCedant;
-  // The cedant portal has one seat; only the broker desk has an acting seat.
-  $("#seat-switch").hidden = isCedant;
-  $("#avatar").textContent = isCedant ? chrome.avatar : currentUser().initials;
-  $("#sidebar-foot").textContent = chrome.footer;
 
-  emit(TOPICS.ROLE, role);
+  $("#identity-name").textContent = user.name;
+  $("#identity-title").textContent = user.title;
+  $("#avatar").textContent = user.initials;
+  $("#sidebar-foot").textContent = isCedant
+    ? `${user.cedant} · read-only`
+    : chrome.footer;
+
+  emit(TOPICS.ROLE, portal);
   showView(chrome.landing);
 }
 
@@ -89,26 +98,9 @@ export function initShell() {
     if (item) showView(item.dataset.view);
   });
 
-  $("#role-broker").addEventListener("click", () => setRole(ROLES.BROKER));
-  $("#role-cedant").addEventListener("click", () => setRole(ROLES.CEDANT));
-
-  const seatSelect = $("#seat-select");
-  seatSelect.innerHTML = Object.entries(DESK_USERS)
-    .map(([seat, u]) => `<option value="${seat}">${u.name} · ${u.title}</option>`)
-    .join("");
-  seatSelect.value = state.seat;
-  seatSelect.addEventListener("change", (e) => setSeat(e.target.value));
 }
 
-/**
- * Change who is at the desk. Anything gated on authority — releasing a slip
- * above all — re-reads from here, so the active view is refreshed rather than
- * left showing the previous seat's options.
- */
-export function setSeat(seat) {
-  state.seat = seat;
-  $("#seat-select").value = seat;
-  if (state.role !== ROLES.CEDANT) $("#avatar").textContent = currentUser().initials;
-  emit(TOPICS.SEAT, seat);
-  refreshActiveView();
+/** Wire sign-out once, at boot. */
+export function onSignOut(handler) {
+  $("#sign-out").addEventListener("click", handler);
 }

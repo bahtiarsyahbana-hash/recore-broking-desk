@@ -13,59 +13,17 @@
  * replacing `currentUser()` and nothing else.
  */
 
-/** The two seats at the desk. */
-export const DESK_USERS = {
-  broker: {
-    id: "vr",
-    name: "Victor Roy",
-    initials: "VR",
-    title: "Placement Broker",
-    /** May prepare and submit, but not release to market. */
-    canReleaseSlips: false,
-  },
-  signatory: {
-    id: "ml",
-    name: "Maya Lindqvist",
-    initials: "ML",
-    title: "Authorised Signatory",
-    canReleaseSlips: true,
-  },
-  /*
-   * A second signatory is not decoration. With only one, any slip that person
-   * prepared could never be released by anybody — four-eyes would deadlock the
-   * placement permanently, with no way out of the drawer. Any desk operating
-   * this control in earnest has at least two people who can sign.
-   */
-  signatory2: {
-    id: "ao",
-    name: "Adeola Okonjo",
-    initials: "AO",
-    title: "Authorised Signatory",
-    canReleaseSlips: true,
-  },
-  /*
-   * The administrator releases without the separate-person rule, including
-   * slips they prepared themselves. This is an override, not an exemption the
-   * control forgot about: it keeps the desk moving while the full approval
-   * hierarchy is still being set up.
-   *
-   * Turning it off later means deleting `bypassFourEyes` from this record —
-   * nothing else reads it.
-   */
-  admin: {
-    id: "adm",
-    name: "Desk Administrator",
-    initials: "AD",
-    title: "Administrator",
-    canReleaseSlips: true,
-    bypassFourEyes: true,
-  },
-};
+import { USERS, brokerUsers } from "../data/users.data.js";
 
-export const DEFAULT_SEAT = "broker";
+/**
+ * The broker seats, keyed by user id. Authority now travels with the signed-in
+ * user rather than a dropdown, so this is derived from the user records rather
+ * than declared a second time.
+ */
+export const DESK_USERS = Object.fromEntries(brokerUsers().map((u) => [u.id, u]));
 
-/** @returns {object} the seat's user record, falling back to the broker. */
-export const userForSeat = (seat) => DESK_USERS[seat] || DESK_USERS[DEFAULT_SEAT];
+/** Any account, broker or cedant, by id. */
+export const userById = (id) => USERS.find((u) => u.id === id);
 
 /** Readable list: "A", "A or B", "A, B or C". */
 function orList(names) {
@@ -81,11 +39,11 @@ function orList(names) {
  * @returns {{seat: string, name: string, title: string}[]}
  */
 export function eligibleApprovers(program) {
-  return Object.entries(DESK_USERS)
-    .filter(([, u]) => u.canReleaseSlips)
+  return brokerUsers()
+    .filter((u) => u.canReleaseSlips)
     // The administrator stays eligible even on their own submissions.
-    .filter(([, u]) => u.bypassFourEyes || !program.preparedBy || program.preparedBy.id !== u.id)
-    .map(([seat, u]) => ({ seat, name: u.name, title: u.title }));
+    .filter((u) => u.bypassFourEyes || !program.preparedBy || program.preparedBy.id !== u.id)
+    .map((u) => ({ username: u.username, name: u.name, title: u.title }));
 }
 
 /** "Maya Lindqvist or Adeola Okonjo can release this slip." */
@@ -94,7 +52,9 @@ export function approverHint(program) {
   if (!eligible.length) {
     return "No other authorised signatory is available, so this slip cannot be released. It needs to be prepared by someone else.";
   }
-  return `${orList(eligible.map((u) => u.name))} can release this slip — switch seats in the top bar.`;
+  // Identity comes from sign-in now, so the instruction has to match: there is
+  // no seat switcher to reach for.
+  return `${orList(eligible.map((u) => u.name))} can release this slip. Sign out and sign back in as one of them.`;
 }
 
 /**

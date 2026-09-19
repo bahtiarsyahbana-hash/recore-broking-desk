@@ -5,8 +5,7 @@
  * account. The upload is acknowledged inline; matching happens desk-side.
  */
 import { $, mount, onAction } from "../../core/dom.js";
-import { programsForCedant } from "../../core/store.js";
-import { PORTAL_CEDANT } from "../../core/config.js";
+import { programsForCedant, currentCedant } from "../../core/store.js";
 import { receiveBordereau } from "../../services/bordereaux.service.js";
 
 /** How long the confirmed state stays on the button, in ms. */
@@ -61,7 +60,7 @@ export const cedantBordereauView = {
   },
 
   refresh() {
-    mount("#cb-program", programsForCedant(PORTAL_CEDANT)
+    mount("#cb-program", programsForCedant(currentCedant())
       .map((p) => `<option>${p.id} · ${p.cls}</option>`).join(""));
   },
 };

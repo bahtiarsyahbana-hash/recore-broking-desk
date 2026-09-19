@@ -12,16 +12,41 @@
  *   ui/       shared presentational pieces — badges, charts, overlays
  *   views/    one screen each: render markup, mount handlers, refresh on events
  */
-import { initShell, registerView, setRole } from "./core/router.js";
+import { $ } from "./core/dom.js";
+import { state } from "./core/store.js";
+import { initShell, registerView, openWorkspace, onSignOut } from "./core/router.js";
 import { initModalHost } from "./ui/modal.js";
-import { ROLES } from "./core/navigation.js";
+import { renderLogin } from "./ui/login.js";
 import { allViews } from "./views/index.js";
+
+/** Swap between the sign-in screen and the application shell. */
+function show(screen) {
+  $("#login-root").hidden = screen !== "login";
+  $("#app-root").hidden = screen !== "app";
+}
+
+function signIn(user) {
+  state.session = user;
+  $("#login-root").innerHTML = "";
+  show("app");
+  openWorkspace();
+}
+
+function signOut() {
+  state.session = null;
+  show("login");
+  renderLogin("#login-root", signIn);
+}
 
 function boot() {
   initModalHost();
   initShell();
   allViews.forEach(registerView);
-  setRole(ROLES.BROKER);
+  onSignOut(signOut);
+
+  // Nothing of the desk is rendered until an account is chosen.
+  show("login");
+  renderLogin("#login-root", signIn);
 }
 
 boot();

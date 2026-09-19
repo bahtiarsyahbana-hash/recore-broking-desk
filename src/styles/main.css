@@ -21,5 +21,6 @@
 @import url("components/banner.css");
 @import url("components/lifecycle.css");
 @import url("components/misc.css");
+@import url("components/login.css");
 
 @import url("responsive.css");

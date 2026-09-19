@@ -6,14 +6,13 @@
  */
 import { mount, row } from "../../core/dom.js";
 import { fmtFull } from "../../core/format.js";
-import { programsForCedant } from "../../core/store.js";
+import { programsForCedant, currentCedant } from "../../core/store.js";
 import { on, TOPICS } from "../../core/events.js";
-import { PORTAL_CEDANT } from "../../core/config.js";
 import { technicalAccount } from "../../domain/technical-account.js";
 import { emptyState } from "../../ui/badges.js";
 
 function statement() {
-  const mine = programsForCedant(PORTAL_CEDANT);
+  const mine = programsForCedant(currentCedant());
   // The treaty program carries the statement; fall back to whatever exists.
   const program = mine[1] || mine[0];
   if (!program) return emptyState("No programs placed yet.");

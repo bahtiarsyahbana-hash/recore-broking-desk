@@ -12,11 +12,12 @@ import { programs as seedPrograms } from "../data/programs.data.js";
 import { bordereaux as seedBordereaux } from "../data/bordereaux.data.js";
 import { claims as seedClaims } from "../data/claims.data.js";
 import { financeDocs as seedFinanceDocs } from "../data/finance.data.js";
+import { PORTAL_CEDANT } from "./config.js";
 import {
   cedants as seedCedants, markets as seedMarkets,
   brokers as seedBrokers, others as seedOthers,
 } from "../data/counterparties.data.js";
-import { userForSeat, DEFAULT_SEAT } from "../domain/authority.js";
+
 
 export const state = {
   programs: seedPrograms.map((p) => ({ ...p })),
@@ -33,17 +34,25 @@ export const state = {
   others: seedOthers.map((o) => ({ ...o })),
   /** Risks the cedant portal has sent that the desk has not yet picked up. */
   pendingSubmissions: [],
-  /** Active role: "broker" | "cedant". */
-  role: "broker",
   /**
-   * Which seat at the broker desk is acting: "broker" | "signatory".
-   * Four-eyes on slip release turns on this, so it is state, not a preference.
+   * The signed-in user, or null before sign-in. Identity is no longer a
+   * dropdown: whose authority applies, and which portal opens, both follow
+   * from who signed in.
    */
-  seat: DEFAULT_SEAT,
+  session: null,
 };
 
-/** The person currently at the desk. */
-export const currentUser = () => userForSeat(state.seat);
+/** The signed-in user. Null until sign-in completes. */
+export const currentUser = () => state.session;
+
+/** Which workspace the signed-in user belongs to: "broker" | "cedant". */
+export const currentPortal = () => state.session?.portal ?? "broker";
+
+/**
+ * Whose book the cedant portal shows — the signed-in cedant, falling back to
+ * the configured default so the portal still renders if opened without one.
+ */
+export const currentCedant = () => state.session?.cedant ?? PORTAL_CEDANT;
 
 /** Document and program numbering, continuing from the seeded data. */
 export const sequences = {

@@ -10,7 +10,21 @@ claims, accounting, and an optional cedant portal.
 npm run dev
 ```
 
-Then open <http://localhost:4173>.
+Then open <http://localhost:4173> and sign in. Every demo account and its
+password is printed on the sign-in screen — click one to fill the form.
+
+| Username | Password | Who |
+|---|---|---|
+| `vroy` | `victor2026` | Victor Roy · Placement Broker — prepares, cannot release |
+| `mlindqvist` | `maya2026` | Maya Lindqvist · Authorised Signatory |
+| `aokonjo` | `adeola2026` | Adeola Okonjo · Authorised Signatory |
+| `admin` | `admin2026` | Desk Administrator — releases anything, including own work |
+| `meridian` | `meridian2026` | Cedant portal · Meridian Mutual Insurance |
+| `pacifico` | `pacifico2026` | Cedant portal · Pacífico General Insurance |
+
+**This sign-in is not security.** Credentials live in the browser, the check is
+a client-side string match, and the passwords are printed on screen on purpose.
+It decides which workspace opens and whose authority applies — nothing more.
 
 There is no build step, no bundler and no dependencies — `npm install` is not
 needed and `node_modules` stays empty. The dev server is a ~60-line zero-
@@ -67,9 +81,11 @@ Preparing a submission and releasing it to market are **separate acts by
 different people**. The wizard saves a draft; an authorised signatory reviews
 and releases it. The preparer cannot release their own slip, and the gate
 enforces that signed lines total exactly 100% and the cedant's KYC is current.
-Switch seats with the *Acting as* control in the top bar: a placement broker,
-two authorised signatories, and an administrator who can release without the
-separate-person rule — marked on the record whenever that override is used. Where a release is blocked, the drawer names who
+Who you are follows from the account you sign in with — there is no seat or
+role switcher inside the app. A broker cannot step into the cedant portal, and
+a cedant sees only their own book. To release a slip you prepared yourself, sign
+out and back in as a signatory; the administrator account can release anything,
+and the record is marked whenever that override is used. Where a release is blocked, the drawer names who
 can release it rather than leaving you to work it out. Binding raises the market invoice automatically.
 Claims are held by credit control while their program's premium is outstanding.
 

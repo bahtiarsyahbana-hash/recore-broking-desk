@@ -16,7 +16,10 @@
   by JavaScript: the sidebar from core/navigation.js, the active view from its own
   module under js/views/, and overlays from js/ui/.
 -->
-<div class="app">
+<!-- Sign-in renders here; the app shell stays hidden until a session exists. -->
+<div id="login-root"></div>
+
+<div class="app" id="app-root" hidden>
   <aside class="sidebar">
     <div class="brand">
       <div class="mark">R</div>
@@ -32,21 +35,20 @@
 
   <div class="main">
     <header class="topbar">
-      <div class="roleswitch">
-        <button id="role-broker" class="active">Broker Desk</button>
-        <button id="role-cedant">Cedant Portal</button>
-      </div>
+      <!-- Which workspace you are in follows from the account, not a toggle. -->
+      <span class="workspace" id="workspace-label"></span>
       <span class="chip" id="cedant-flag-chip" hidden>optional module · limited access</span>
       <div class="spacer"></div>
       <span class="chip" id="chip-uwy"></span>
       <span class="chip" id="chip-ccy"></span>
-      <!-- Which seat at the broker desk is acting. Slip release is four-eyes,
-           so this is a real control, not a display preference. -->
-      <label class="seat" id="seat-switch">
-        <span class="seat-caption">Acting as</span>
-        <select id="seat-select"></select>
-      </label>
-      <div class="avatar" id="avatar"></div>
+      <div class="identity">
+        <div class="identity-text">
+          <span class="identity-name" id="identity-name"></span>
+          <span class="identity-title" id="identity-title"></span>
+        </div>
+        <div class="avatar" id="avatar"></div>
+        <button class="btn ghost sign-out" id="sign-out" title="Sign out">Sign out</button>
+      </div>
     </header>
 
     <!-- The active view module renders here. -->

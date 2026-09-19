@@ -7,13 +7,12 @@
  */
 import { mount } from "../../core/dom.js";
 import { fmtFull } from "../../core/format.js";
-import { programsForCedant } from "../../core/store.js";
+import { programsForCedant, currentCedant } from "../../core/store.js";
 import { on, TOPICS } from "../../core/events.js";
-import { PORTAL_CEDANT } from "../../core/config.js";
 import { statusPill, typeBadge } from "../../ui/badges.js";
 import { icons } from "../../ui/icons.js";
 
-const rows = () => programsForCedant(PORTAL_CEDANT).map((p) => `<tr>
+const rows = () => programsForCedant(currentCedant()).map((p) => `<tr>
     <td><strong>${p.id}</strong></td>
     <td>${p.cls}</td>
     <td>${typeBadge(p.type)}</td>
@@ -29,7 +28,7 @@ export const cedantProgramsView = {
     <div class="view-head">
       <div>
         <h1>My Programs</h1>
-        <p>Everything Meridian Bridge Re Brokers is placing on your behalf — a read-only mirror of your own book.</p>
+        <p>Everything Meridian Bridge Re Brokers is placing on behalf of ${currentCedant()} — a read-only mirror of your own book.</p>
       </div>
     </div>
     <div class="banner brass">${icons.info}The cedant portal is an optional, restricted view. Your broker sees the full placement, accounting and claims workspace — you see only your own programs, submissions and statements.</div>

@@ -6,6 +6,7 @@
  * renders the sidebar from this; nothing about navigation lives in the HTML.
  */
 import { icons } from "../ui/icons.js";
+import { currentCedant } from "./store.js";
 
 export const ROLES = {
   BROKER: "broker",
@@ -32,7 +33,7 @@ export const brokerNav = [
 
 /** Cedant portal — the optional, restricted mirror of one cedant's own book. */
 export const cedantNav = [
-  { section: "Cedant Portal · Meridian Mutual" },
+  { section: () => `Cedant Portal · ${currentCedant()}` },
   { view: "c-programs",  label: "My Programs",      icon: icons.folder },
   { view: "c-submit",    label: "Submit a Risk",    icon: icons.plusCircle },
   { view: "c-bdx",       label: "Upload Bordereau", icon: icons.upload },
