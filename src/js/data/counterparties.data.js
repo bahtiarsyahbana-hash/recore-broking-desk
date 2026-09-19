@@ -65,10 +65,15 @@ export const others = [
 
 
 /**
- * Signed capacity committed per reinsurer across all live programs, used by the
- * exposure/accumulation report. Keyed by market name.
+ * The capacity line each market has agreed to make available to the desk —
+ * what they are willing to write, not what they have written.
+ *
+ * Actual exposure is never read from here: it is derived from the lines signed
+ * on real placements (see `exposureByReinsurer`). These two used to be
+ * conflated, which let the accumulation report show a market 7x its true
+ * exposure and give capacity to markets carrying no placement at all.
  */
-export const committedCapacity = {
+export const capacityLines = {
   "Helvetia Continental Re": 12400000,
   "Zenith Re · Syndicate 2044": 9800000,
   "Andean Capacity Re": 6100000,

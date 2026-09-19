@@ -5,7 +5,7 @@
  * without owning any drawing code. Colours come from CSS custom properties
  * wherever possible so the charts follow the theme.
  */
-import { CHART_COLORS, LOSS_RATIO_WATCH_LINE } from "../core/config.js";
+import { CHART_COLORS, LOSS_RATIO_WATCH_LINE, CONCENTRATION_WATCH_PCT } from "../core/config.js";
 import { fmt, pct } from "../core/format.js";
 
 /**
@@ -75,4 +75,37 @@ export function lossRatioBars(rows) {
   }).join("");
 
   return `<svg viewBox="0 0 ${w} ${rows.length * (barH + gap)}" width="100%" height="${rows.length * (barH + gap)}">${bars}</svg>`;
+}
+
+/**
+ * Ranked share bars — who holds how much of the book.
+ *
+ * Drawn as HTML rather than SVG on purpose: counterparty names are long and
+ * unpredictable ("Marlow Underwriting · Syndicate 1918"), and text flow handles
+ * that at any width where an SVG label would need truncating or clipping.
+ *
+ * @param {{rows: object[], total: number, flagged: object[]}} result from concentration()
+ * @param {{format?: (n:number) => string, empty?: string}} [options]
+ */
+export function concentrationBars(result, { format = fmt, empty = "Nothing to show yet." } = {}) {
+  if (!result.rows.length) return `<div class="empty">${empty}</div>`;
+
+  const rows = result.rows.map((row) => {
+    const flagged = !row.isOther && row.share >= CONCENTRATION_WATCH_PCT;
+    return `<div class="conc-row${row.isOther ? " is-other" : ""}${flagged ? " is-flagged" : ""}">
+      <div class="conc-head">
+        <span class="conc-name">${row.name}</span>
+        <span class="conc-figures"><span class="mono">${format(row.value)}</span><span class="conc-share mono">${row.share.toFixed(1)}%</span></span>
+      </div>
+      <div class="conc-bar"><span style="width:${Math.max(row.share, 0.8)}%"></span></div>
+    </div>`;
+  }).join("");
+
+  const note = result.flagged.length
+    ? `<div class="conc-note">${result.flagged.length === 1
+        ? `${result.flagged[0].name} alone is ${result.flagged[0].share.toFixed(0)}% of the total.`
+        : `${result.flagged.length} counterparties are each at or above ${CONCENTRATION_WATCH_PCT}%.`}</div>`
+    : "";
+
+  return rows + note;
 }

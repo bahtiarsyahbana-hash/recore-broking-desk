@@ -16,6 +16,13 @@ export const FX_TO_BASE = { USD: 1, CAD: 0.73 };
 /** Portfolio loss ratio above which the dashboard flags the book. */
 export const LOSS_RATIO_WATCH_LINE = 70;
 
+/**
+ * Share of the book a single counterparty may hold before it is flagged.
+ * A desk where one client or one market is a quarter of everything has a
+ * concentration problem worth seeing on the dashboard.
+ */
+export const CONCENTRATION_WATCH_PCT = 25;
+
 /** Renewals surface on the dashboard this many days before expiry. */
 export const RENEWAL_HORIZON_DAYS = 60;
 

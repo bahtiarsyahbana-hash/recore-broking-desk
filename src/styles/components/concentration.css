@@ -1,0 +1,34 @@
+/* Ranked share bars — premium by cedant, exposure by reinsurer.
+
+   The bar is a reading aid, not the data: the figure and the share are both
+   printed, so the panel still works for anyone who cannot compare bar lengths
+   by eye. */
+.conc-row{ margin-bottom:11px; }
+.conc-row:last-of-type{ margin-bottom:0; }
+.conc-head{
+  display:flex; justify-content:space-between; align-items:baseline;
+  gap:12px; margin-bottom:5px;
+}
+.conc-name{ font-size:12.5px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
+.conc-figures{ display:flex; align-items:baseline; gap:10px; flex:none; font-size:12px; }
+.conc-figures .mono{ color:var(--ink-soft); }
+.conc-share{ min-width:44px; text-align:right; font-weight:700; color:var(--ink) !important; }
+
+.conc-bar{ height:7px; border-radius:4px; background:var(--surface-2); overflow:hidden; }
+.conc-bar span{
+  display:block; height:100%; border-radius:4px; background:var(--marine);
+  transition:width .25s ease;
+}
+
+/* A counterparty at or above the watch line is the point of the panel. */
+.conc-row.is-flagged .conc-share{ color:var(--warn) !important; }
+.conc-row.is-flagged .conc-bar span{ background:var(--warn); }
+
+/* The collapsed tail is context, not a counterparty — it recedes. */
+.conc-row.is-other .conc-name{ font-weight:500; color:var(--ink-soft); font-style:italic; }
+.conc-row.is-other .conc-bar span{ background:var(--line); }
+
+.conc-note{
+  margin-top:12px; padding-top:10px; border-top:1px solid var(--line-soft);
+  font-size:11.5px; font-weight:600; color:var(--warn);
+}

@@ -8,8 +8,11 @@ import { state } from "../../core/store.js";
 import { on, TOPICS } from "../../core/events.js";
 import { TODAY, LOSS_RATIO_WATCH_LINE, RENEWAL_URGENT_DAYS } from "../../core/config.js";
 import { agedCreditorTotal } from "../../data/finance.data.js";
-import { portfolioTotals, premiumByClass, openClaims, renewalsDue } from "../../domain/portfolio.js";
-import { barChart, lineChart } from "../../ui/charts.js";
+import {
+  portfolioTotals, premiumByClass, openClaims, renewalsDue,
+  premiumByCedant, exposureByReinsurer, concentration,
+} from "../../domain/portfolio.js";
+import { barChart, lineChart, concentrationBars } from "../../ui/charts.js";
 import { emptyState } from "../../ui/badges.js";
 import { icons } from "../../ui/icons.js";
 import { openWizard } from "../../ui/submission-wizard.js";
@@ -98,6 +101,19 @@ export const dashboardView = {
       </div>
     </div>
 
+    <div class="cols-2" style="margin-top:16px;">
+      <div class="card">
+        <div class="panel-title">Premium by cedant</div>
+        <div class="panel-sub">What the book depends on — a client too large to lose is the desk's biggest commercial risk</div>
+        <div id="conc-cedant"></div>
+      </div>
+      <div class="card">
+        <div class="panel-title">Exposure by reinsurer</div>
+        <div class="panel-sub">Premium apportioned by the lines each market actually signed</div>
+        <div id="conc-reinsurer"></div>
+      </div>
+    </div>
+
     <div class="card" style="margin-top:16px;">
       <div class="panel-title">Recent activity</div>
       <div class="panel-sub">Straight-through from placement, bordereaux and claims</div>
@@ -118,6 +134,15 @@ export const dashboardView = {
     mount("#renewals-list", renewalRows());
     mount("#chart-bar", barChart(premiumByClass(state.programs)));
     mount("#chart-line", lineChart([...TREND_HISTORY, totals.lossRatio]));
+
+    mount("#conc-cedant", concentrationBars(
+      concentration(premiumByCedant(state.programs)),
+      { empty: "No bound premium yet." },
+    ));
+    mount("#conc-reinsurer", concentrationBars(
+      concentration(exposureByReinsurer(state.programs)),
+      { empty: "No signed lines yet." },
+    ));
   },
 };
 

@@ -27,3 +27,7 @@ td.num, th.num{ text-align:right; }
 .reg-contact a:hover{ text-decoration:underline; }
 .reg-code{ display:inline-block; font-size:10.5px; color:var(--ink-soft); background:var(--surface-2);
   padding:2px 7px; border-radius:5px; margin-top:4px; }
+
+/* A market carrying nothing is still worth listing — that is spare capacity —
+   but it should not compete with the rows that hold exposure. */
+tbody tr.is-idle td{ color:var(--ink-soft); }

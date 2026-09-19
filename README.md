@@ -96,6 +96,12 @@ Capacity Re has queried the terms" — with its button attached, and a checklist
 states what is still holding the bind. The only hard gate is that **every named
 market must be Confirmed**; binding instructions are optional.
 
+The dashboard shows **concentration** alongside the totals: premium by cedant
+and exposure by reinsurer, each ranked with a flag when a single counterparty
+holds a quarter of the book or more. A desk's two largest commercial risks are
+a client too big to lose and a market too big to fail, and neither is visible
+in a total.
+
 **Registry** — the counterparty address book, one page per category: Cedants,
 Reinsurance, Lloyd's Syndicates, Reinsurance Brokers and Others. They are kept
 apart because the categories are not interchangeable — what a counterparty may

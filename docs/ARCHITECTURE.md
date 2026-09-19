@@ -73,7 +73,9 @@ where the business is, and it is the layer worth unit-testing first.
   `nextAction` always reports the same step number as the journey rail —
   `stepIndexFor(status)` is the single source of truth for position.
 - `portfolio.js` — book-level analytics: totals, premium by class, loss ratios,
-  renewals due
+  renewals due, and **concentration** — premium by cedant, exposure by
+  reinsurer, and `concentration()`, which ranks any `{name: amount}` map into
+  shares with the tail collapsed so the percentages still sum to 100
 - `session.js` — sign-in. **Not security**: a client-side string match against
   credentials that ship in the browser and are printed on the sign-in screen.
   Replacing it with real auth means swapping this module and deleting
@@ -260,6 +262,14 @@ them behind their back would make every confirmation meaningless.
 
 ## Fixed since the split
 
+- **The accumulation report showed invented numbers.** `committedCapacity` was
+  a stored map with no relationship to the placements, so the report overstated
+  Helvetia 7x, understated Andean 2x, and gave capacity to nine markets that
+  carried no placement at all. Exposure is now derived from the lines actually
+  signed (`exposureByReinsurer`), and the stored figure is kept — renamed
+  `capacityLines` — as what it honestly is: the line a market has agreed to
+  make available, which makes utilisation computable. Two markets turn out to
+  be over their agreed line.
 - **The wizard discarded every term it collected.** `structureLine()` read the
   step-2 inputs with `document.getElementById`, but it ran at step 4 — by which
   point `paintWizard` had already replaced that markup, so every lookup returned
