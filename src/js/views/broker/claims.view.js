@@ -8,9 +8,16 @@ import { state } from "../../core/store.js";
 import { on, TOPICS } from "../../core/events.js";
 import { statusPill } from "../../ui/badges.js";
 import { icons } from "../../ui/icons.js";
+import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 import { advanceClaim, registerClaim, premiumSettled, isHeldByCreditControl }
   from "../../services/claims.service.js";
 
+const pager = createPager(() => claimsView.refresh());
+
+/**
+ * `i` is the claim's index in the full list, not on the page: the Process
+ * button dispatches on it, so paginating must not renumber it.
+ */
 function claimRow(claim, i) {
   const paid = premiumSettled(claim);
   const held = isHeldByCreditControl(claim);
@@ -50,9 +57,11 @@ export const claimsView = {
         <tbody id="claims-body"></tbody>
       </table>
     </div>
+    <div id="claims-pager"></div>
   </section>`,
 
   mount() {
+    pager.wire("#view-root");
     onAction("#view-root", {
       "register": () => registerClaim(),
       "advance": ({ i }) => advanceClaim(+i),
@@ -60,7 +69,12 @@ export const claimsView = {
   },
 
   refresh() {
-    mount("#claims-body", state.claims.map(claimRow).join(""));
+    // Pair each claim with its real index before slicing, so the page shows
+    // rows 11-20 while their buttons still address claims 11-20.
+    const indexed = state.claims.map((claim, index) => ({ claim, index }));
+    const page = paginate(indexed, pager.page);
+    mount("#claims-body", page.items.map(({ claim, index }) => claimRow(claim, index)).join(""));
+    mount("#claims-pager", paginationControls(page, { unit: "claims" }));
   },
 };
 

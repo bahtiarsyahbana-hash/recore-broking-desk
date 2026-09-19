@@ -12,15 +12,18 @@ import { programsForCedant, currentCedant } from "../../core/store.js";
 import { on, TOPICS } from "../../core/events.js";
 import { statusPill, typeBadge } from "../../ui/badges.js";
 import { icons } from "../../ui/icons.js";
+import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 
-const rows = () => programsForCedant(currentCedant()).map((p) => `<tr>
+const pager = createPager(() => cedantProgramsView.refresh());
+
+const programRow = (p) => `<tr>
     <td><strong>${p.id}</strong></td>
     <td>${p.cls}</td>
     <td>${typeBadge(p.type)}</td>
     <td class="num">${fmtFull(p.premium, p.ccy)}</td>
     <td>${statusPill(p.status)}</td>
     <td>${p.expiry}</td>
-  </tr>`).join("");
+  </tr>`;
 
 export const cedantProgramsView = {
   id: "c-programs",
@@ -42,10 +45,17 @@ export const cedantProgramsView = {
         <tbody id="c-programs-body"></tbody>
       </table>
     </div>
+    <div id="c-programs-pager"></div>
   </section>`,
 
+  mount() {
+    pager.wire("#view-root");
+  },
+
   refresh() {
-    mount("#c-programs-body", rows());
+    const page = paginate(programsForCedant(currentCedant()), pager.page);
+    mount("#c-programs-body", page.items.map(programRow).join(""));
+    mount("#c-programs-pager", paginationControls(page, { unit: "programs" }));
   },
 };
 

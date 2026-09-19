@@ -116,6 +116,13 @@ case- and whitespace-insensitive and spans all five categories.
 
 ### `ui/` — shared presentation
 
+`pagination.js` paginates every list in the app at ten rows a page. Two pure
+functions plus a small state holder, so a 418-record registry and a four-row
+claims table behave identically in code — the controls simply do not render
+when everything already fits. A `name` scopes the controls to one pager,
+because Reports has two paginated lists on one view and either set of buttons
+would otherwise move both.
+
 `form-modal.js` renders a form from a field schema, validates on submit, and
 shows per-field errors **without closing** — a rejected entry keeps everything
 already typed. Fields marked `hidden` are carried through to the record without
@@ -181,6 +188,13 @@ mapping to `COLLECTIONS` in `services/registry.service.js`, an entry to
 `REGISTRY_CATEGORIES` in `views/broker/registry.view.js`, and a nav entry in
 `core/navigation.js`. The page and its add-form are both built by
 `createRegistryView()` — there is no per-category view or form file to write.
+
+**A paginated list:** slice with `paginate()`, render
+`paginationControls(page, { unit, name })` beneath, and keep a `createPager()`
+whose callback re-runs the view's `refresh`. Reset it whenever a filter changes
+the list — page 7 of the old results means nothing once the filter moves. Where
+a row's action carries its index, pair each item with its real index *before*
+slicing: the claims table dispatches on it.
 
 **A new field on an existing category:** add it to that category's schema in
 `views/broker/registry-fields.js`. It renders, validates and saves with no other

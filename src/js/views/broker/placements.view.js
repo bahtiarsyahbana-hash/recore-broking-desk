@@ -8,6 +8,7 @@ import { state } from "../../core/store.js";
 import { on, TOPICS } from "../../core/events.js";
 import { statusPill, typeBadge } from "../../ui/badges.js";
 import { isPreMarket } from "../../domain/lifecycle.js";
+import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 import { icons } from "../../ui/icons.js";
 import { openWizard } from "../../ui/submission-wizard.js";
 import { openProgramDetail } from "../../ui/program-detail.js";
@@ -37,8 +38,9 @@ const visiblePrograms = () => state.programs
   .filter(STAGES[activeStage].match)
   .filter((p) => activeFilter === "all" || p.type === activeFilter);
 
-const rows = () => visiblePrograms()
-  .map((p) => `<tr>
+const pager = createPager(() => placementsView.refresh());
+
+const programRow = (p) => `<tr>
     <td><strong>${p.id}</strong></td>
     <td>${p.cedant}</td>
     <td>${p.cls}</td>
@@ -47,11 +49,13 @@ const rows = () => visiblePrograms()
     <td class="num">${fmtFull(p.premium, p.ccy)}</td>
     <td>${statusPill(p.status)}</td>
     <td><button class="btn ghost" style="padding:5px 10px;" data-action="open-detail" data-id="${p.id}">Lifecycle →</button></td>
-  </tr>`).join("") || `<tr><td colspan="8"><div class="empty">Nothing here. ${
-    activeStage === "drafts"
-      ? "New submissions are saved as drafts and appear here until they are released to market."
-      : "Try a different stage or type filter."
-  }</div></td></tr>`;
+  </tr>`;
+
+const emptyRow = () => `<tr><td colspan="8"><div class="empty">Nothing here. ${
+  activeStage === "drafts"
+    ? "New submissions are saved as drafts and appear here until they are released to market."
+    : "Try a different stage or type filter."
+}</div></td></tr>`;
 
 export const placementsView = {
   id: "placements",
@@ -86,6 +90,7 @@ export const placementsView = {
         <tbody id="placements-body"></tbody>
       </table>
     </div>
+    <div id="placements-pager"></div>
   </section>`,
 
   mount() {
@@ -99,6 +104,7 @@ export const placementsView = {
         $$("#placement-filter button").forEach((x) => x.classList.remove("active"));
         b.classList.add("active");
         activeFilter = b.dataset.f;
+        pager.reset();
         placementsView.refresh();
       });
     });
@@ -114,7 +120,9 @@ export const placementsView = {
   },
 
   refresh() {
-    mount("#placements-body", rows());
+    const page = paginate(visiblePrograms(), pager.page);
+    mount("#placements-body", page.items.map(programRow).join("") || emptyRow());
+    mount("#placements-pager", paginationControls(page, { unit: "placements" }));
   },
 };
 

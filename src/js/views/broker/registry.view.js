@@ -19,6 +19,7 @@ import { fieldsFor } from "./registry-fields.js";
 import { registryRow, statusPill, emptyState, contactLine, codeBadge } from "../../ui/badges.js";
 import { icons } from "../../ui/icons.js";
 import { openFormModal } from "../../ui/form-modal.js";
+import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 import { addCounterparty, validateCounterparty } from "../../services/registry.service.js";
 
 /**
@@ -133,6 +134,7 @@ const searchText = (entry) => Object.values(entry)
 export function createRegistryView(category) {
   /** Reset per mount, so switching pages does not carry a stale filter. */
   let query = "";
+  const pager = createPager(() => view.refresh());
   /** Countries already on the registry, offered as type-ahead suggestions so
    *  the book does not drift into "USA" and "United States" as two places. */
   const knownCountries = () =>
@@ -182,8 +184,13 @@ export function createRegistryView(category) {
     mount() {
       onAction("#view-root", { add: openAddForm });
       query = "";
+      pager.reset();
+      pager.wire("#view-root");
       $(`#${category.id}-search`)?.addEventListener("input", (e) => {
         query = e.target.value.trim().toLowerCase();
+        // A narrowed list starts again at the top; page 7 of the old results
+        // means nothing once the filter changes.
+        pager.reset();
         view.refresh();
       });
     },
@@ -197,8 +204,11 @@ export function createRegistryView(category) {
         ? all.filter((e) => { const hay = searchText(e); return terms.every((t) => hay.includes(t)); })
         : all;
 
+      const page = paginate(shown, pager.page);
+
       mount(`#${category.id}-list`, shown.length
-        ? `<div class="reg-list">${shown.map(category.row).join("")}</div>`
+        ? `<div class="reg-list">${page.items.map(category.row).join("")}</div>`
+          + paginationControls(page, { unit: category.unit })
         : emptyState(terms.length
             ? `No ${category.unit} match "${query}".`
             : `No ${category.unit} on file yet.`));

@@ -8,16 +8,19 @@ import { state } from "../../core/store.js";
 import { on, TOPICS } from "../../core/events.js";
 import { statusPill } from "../../ui/badges.js";
 import { icons } from "../../ui/icons.js";
+import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 import { receiveBordereau } from "../../services/bordereaux.service.js";
 
-const rows = () => state.bordereaux.map((b) => `<tr>
+const pager = createPager(() => bordereauxView.refresh());
+
+const bordereauRow = (b) => `<tr>
     <td>${b.period}</td>
     <td>${b.program}</td>
     <td>${b.type}</td>
     <td class="num">${b.lines}</td>
     <td class="num">${fmtFull(b.amount)}</td>
     <td>${statusPill(b.status)}</td>
-  </tr>`).join("");
+  </tr>`;
 
 export const bordereauxView = {
   id: "bordereaux",
@@ -39,14 +42,18 @@ export const bordereauxView = {
         <tbody id="bdx-body"></tbody>
       </table>
     </div>
+    <div id="bdx-pager"></div>
   </section>`,
 
   mount() {
+    pager.wire("#view-root");
     onAction("#view-root", { "upload": () => receiveBordereau() });
   },
 
   refresh() {
-    mount("#bdx-body", rows());
+    const page = paginate(state.bordereaux, pager.page);
+    mount("#bdx-body", page.items.map(bordereauRow).join(""));
+    mount("#bdx-pager", paginationControls(page, { unit: "bordereaux" }));
   },
 };
 

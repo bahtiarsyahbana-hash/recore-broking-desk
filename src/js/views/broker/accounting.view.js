@@ -9,6 +9,7 @@ import { on, TOPICS } from "../../core/events.js";
 import { agedCreditors } from "../../data/finance.data.js";
 import { technicalAccount } from "../../domain/technical-account.js";
 import { financeBadge } from "../../ui/badges.js";
+import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 
 /** Program whose technical account is on screen. */
 let selectedId = null;
@@ -44,7 +45,9 @@ function agedTable() {
   </table></div>`;
 }
 
-const financeRows = () => state.financeDocs.map((f) => `<tr>
+const pager = createPager(() => accountingView.refresh());
+
+const financeRow = (f) => `<tr>
     <td class="mono">${f.id}</td>
     <td>${financeBadge(f.type)}</td>
     <td>${f.program}</td>
@@ -52,7 +55,7 @@ const financeRows = () => state.financeDocs.map((f) => `<tr>
     <td class="num">${fmtFull(f.amount, f.ccy)}</td>
     <td>${f.date}</td>
     <td>${f.co ? `<span class="pill info">${f.co}</span>` : "—"}</td>
-  </tr>`).join("");
+  </tr>`;
 
 export const accountingView = {
   id: "accounting",
@@ -98,6 +101,7 @@ export const accountingView = {
           <tbody id="finance-body"></tbody>
         </table>
       </div>
+      <div id="finance-pager"></div>
     </div>
   </section>`,
 
@@ -110,6 +114,8 @@ export const accountingView = {
         $("#acc-finance").hidden = tab.dataset.a !== "finance";
       });
     });
+
+    pager.wire("#view-root");
 
     $("#acc-select").addEventListener("change", (e) => {
       selectedId = e.target.value;
@@ -128,7 +134,9 @@ export const accountingView = {
 
     paintTechnicalAccount();
     mount("#aged-table", agedTable());
-    mount("#finance-body", financeRows());
+    const page = paginate(state.financeDocs, pager.page);
+    mount("#finance-body", page.items.map(financeRow).join(""));
+    mount("#finance-pager", paginationControls(page, { unit: "documents" }));
   },
 };
 
