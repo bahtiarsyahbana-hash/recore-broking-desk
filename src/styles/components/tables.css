@@ -31,3 +31,7 @@ td.num, th.num{ text-align:right; }
 /* A market carrying nothing is still worth listing — that is spare capacity —
    but it should not compete with the rows that hold exposure. */
 tbody tr.is-idle td{ color:var(--ink-soft); }
+
+/* Registry search. With several hundred counterparties on a page, the filter
+   is not a convenience — it is how the page is used at all. */
+.reg-search{ max-width:360px; }

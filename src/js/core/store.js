@@ -17,7 +17,28 @@ import {
   cedants as seedCedants, markets as seedMarkets,
   brokers as seedBrokers, others as seedOthers,
 } from "../data/counterparties.data.js";
+import {
+  referenceCedants, referenceReinsurers, referenceSyndicates,
+  referenceBrokers, referenceOthers,
+} from "../data/reference.data.js";
 
+
+/**
+ * Build a registry category from the demo book plus imported reference data.
+ *
+ * The demo entries come first and win any name clash: the placements, claims
+ * and finance documents all point at them by name, so an import must never
+ * displace one. Everything is then sorted so the list reads as a directory —
+ * with 400+ cedants, alphabetical order plus search is the only usable shape.
+ */
+function register(...sources) {
+  const byName = new Map();
+  sources.flat().forEach((entry) => {
+    const key = entry.name.trim().toLowerCase();
+    if (!byName.has(key)) byName.set(key, { ...entry });
+  });
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export const state = {
   programs: seedPrograms.map((p) => ({ ...p })),
@@ -28,10 +49,10 @@ export const state = {
    * Counterparty registry. Names are referential keys across programs, claims
    * and finance documents, so entries are added but never renamed in place.
    */
-  cedants: seedCedants.map((c) => ({ ...c })),
-  markets: seedMarkets.map((m) => ({ ...m })),
-  brokers: seedBrokers.map((b) => ({ ...b })),
-  others: seedOthers.map((o) => ({ ...o })),
+  cedants: register(seedCedants, referenceCedants),
+  markets: register(seedMarkets, referenceReinsurers, referenceSyndicates),
+  brokers: register(seedBrokers, referenceBrokers),
+  others: register(seedOthers, referenceOthers),
   /** Risks the cedant portal has sent that the desk has not yet picked up. */
   pendingSubmissions: [],
   /**

@@ -16,6 +16,8 @@ const TONE = {
   "Draft": "neutral", "Pending Approval": "warn",
   "Queried": "warn", "Negotiating": "warn", "Cedant Approval": "warn",
   "Renewal Due": "warn", "Under Review": "warn", "Review due": "warn",
+  // A counterparty nobody has onboarded is neither fine nor failing.
+  "Not assessed": "neutral",
   "Exception": "bad", "Notified": "bad", "Pending Credit Control": "bad", "Overdue": "bad",
 };
 

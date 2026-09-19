@@ -65,7 +65,9 @@ export function releaseChecklist(program, cedant, user) {
       state: cedant?.kyc === "Current" ? "done" : "blocking",
       detail: !cedant ? "Cedant not found on the registry"
         : cedant.kyc === "Current" ? `Refreshed ${cedant.refreshed}`
-        : `KYC ${String(cedant.kyc).toLowerCase()} — refresh before releasing`,
+        : cedant.kyc === "Not assessed"
+          ? "Never onboarded — complete KYC before placing for this cedant"
+          : `KYC ${String(cedant.kyc).toLowerCase()} — refresh before releasing`,
     },
     {
       key: "authority",

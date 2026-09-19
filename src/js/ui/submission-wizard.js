@@ -5,7 +5,7 @@
  * why each step is its own render function rather than one long form. Finishing
  * the wizard issues a slip; it never binds.
  */
-import { $, $$, row } from "../core/dom.js";
+import { $, $$, row, mount } from "../core/dom.js";
 import { fmt } from "../core/format.js";
 import { state } from "../core/store.js";
 import { openModal, updateModal, closeModal } from "./modal.js";
@@ -25,6 +25,7 @@ const TYPES = ["Facultative", "Quota Share", "Surplus", "Excess of Loss"];
 /** Wizard-local state. Reset on every open. */
 let step = 0;
 let draft = { type: "Facultative", markets: {} };
+let marketQuery = "";
 let onIssued = null;
 
 const options = (list, selected) =>
@@ -34,7 +35,12 @@ const options = (list, selected) =>
 
 const stepRiskBasics = () => `
   <div class="field"><label>Cedant</label>
-    <select id="w-cedant">${options(state.cedants.map((c) => c.name), draft.cedant)}</select></div>
+    <input type="text" id="w-cedant" list="w-cedant-options" autocomplete="off"
+      value="${draft.cedant || ""}" placeholder="Start typing a cedant's name">
+    <datalist id="w-cedant-options">${
+      state.cedants.map((c) => `<option value="${c.name.replace(/"/g, "&quot;")}">`).join("")
+    }</datalist>
+    <div class="hint" id="w-cedant-hint">${state.cedants.length} cedants on the registry. Must match one exactly.</div></div>
   <div class="field-row">
     <div class="field"><label>Class of business</label><select id="w-class">${options(CLASSES, draft.cls)}</select></div>
     <div class="field"><label>Type</label><select id="w-type">${options(TYPES, draft.type)}</select></div>
@@ -123,24 +129,67 @@ function formatTerm(field) {
   return String(value);
 }
 
-/** Signed lines across the panel. Binding needs exactly 100%. */
+/** Signed lines across the panel. A slip must reach exactly 100%. */
 const signedTotal = () => Object.values(draft.markets).reduce((a, b) => a + b, 0);
 
-function stepMarketPanel() {
-  const rows = state.markets.map((m, i) => {
-    const line = draft.markets[m.name] ?? (i < 3 ? [40, 35, 25][i] : 0);
-    draft.markets[m.name] = line;
-    return `<div class="market-row">
-      <div><div class="m-name">${m.name}</div><div class="m-rating">${m.rating} · ${m.panel}</div></div>
-      <input type="number" data-m="${m.name}" value="${line}" min="0" max="100"><span style="width:14px;">%</span>
-    </div>`;
-  }).join("");
+/**
+ * Step 3 — the market panel.
+ *
+ * Search-and-add rather than a list of every market: the registry now holds
+ * nearly two hundred carriers, and enumerating them all as number inputs made
+ * the step unusable. A slip names a handful of reinsurers; this asks for those.
+ */
+const MAX_RESULTS = 8;
 
-  return `<div class="panel-sub" style="margin-bottom:10px;">Enter each market's signed line — binding needs 100%.</div>`
-    + rows
-    + `<div class="calc-out" style="margin-top:14px;">
-        <div class="row"><span>Total signed</span><span id="w-total">${signedTotal()}%</span></div>
-      </div>`;
+function marketMatches(query) {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  return state.markets
+    .filter((m) => !(m.name in draft.markets))
+    .filter((m) => {
+      const hay = `${m.name} ${m.rating || ""} ${m.panel || ""} ${m.country || ""}`.toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    })
+    .slice(0, MAX_RESULTS);
+}
+
+function marketResults(query) {
+  if (!query.trim()) return "";
+  const matches = marketMatches(query);
+  if (!matches.length) return `<div class="market-results"><div class="market-none">No markets match "${query}".</div></div>`;
+  return `<div class="market-results">${matches.map((m) => `
+    <button type="button" class="market-result" data-add-market="${m.name}">
+      <span class="m-name">${m.name}</span>
+      <span class="m-rating">${[m.panel, m.rating].filter(Boolean).join(" · ")}</span>
+    </button>`).join("")}</div>`;
+}
+
+function selectedMarkets() {
+  const names = Object.keys(draft.markets);
+  if (!names.length) {
+    return `<div class="empty" style="padding:22px;">No markets on this slip yet. Search above to add one.</div>`;
+  }
+  return names.map((name) => `<div class="market-row">
+      <div><div class="m-name">${name}</div></div>
+      <input type="number" data-m="${name}" value="${draft.markets[name]}" min="0" max="100" aria-label="Signed line for ${name}">
+      <span style="width:14px;">%</span>
+      <button type="button" class="btn ghost" data-drop-market="${name}" title="Take ${name} off the slip" style="padding:6px 8px;">✕</button>
+    </div>`).join("");
+}
+
+function stepMarketPanel() {
+  const total = signedTotal();
+  const tone = total === 100 ? "good" : total > 100 ? "bad" : "warn";
+  return `<div class="panel-sub" style="margin-bottom:10px;">Add each reinsurer on the slip and enter its signed line — binding needs exactly 100%.</div>
+    <div class="field">
+      <input type="search" id="w-market-search" autocomplete="off" value="${marketQuery}"
+        placeholder="Search ${state.markets.length} markets by name, panel or rating">
+    </div>
+    <div id="w-market-results">${marketResults(marketQuery)}</div>
+    <div id="w-market-selected">${selectedMarkets()}</div>
+    <div class="calc-out" style="margin-top:14px;">
+      <div class="row"><span>Total signed</span><span id="w-total" style="color:var(--${tone})">${total}%</span></div>
+    </div>`;
 }
 
 /* ---------- step 4: the summary ---------- */
@@ -238,20 +287,70 @@ function wire() {
     if (e.target.id === "w-type") draft.type = e.target.value;
   });
 
-  // Live signed-line total, tinted against the 100% target.
-  $$("#wizard-body .market-row input").forEach((input) => {
+  // --- step 3: search, add, drop --------------------------------------
+  const search = $("#w-market-search");
+  if (search) {
+    search.addEventListener("input", (e) => {
+      marketQuery = e.target.value;
+      // Only the result list changes, so the search box keeps focus and caret.
+      mount("#w-market-results", marketResults(marketQuery));
+    });
+    search.addEventListener("keydown", (e) => {
+      // Enter adds the single obvious match rather than submitting the step.
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      const [first] = marketMatches(marketQuery);
+      if (first) addMarket(first.name);
+    });
+  }
+
+  body.addEventListener("click", (e) => {
+    const add = e.target.closest("[data-add-market]");
+    if (add) return addMarket(add.dataset.addMarket);
+    const drop = e.target.closest("[data-drop-market]");
+    if (drop) {
+      delete draft.markets[drop.dataset.dropMarket];
+      repaintPanel();
+    }
+  });
+
+  // Line edits update the total without repainting the field being typed in.
+  $$("#wizard-selected-scope [data-m], #w-market-selected [data-m]").forEach((input) => {
     input.addEventListener("input", () => {
-      draft.markets[input.dataset.m] = +input.value || 0;
+      draft.markets[input.dataset.m] = Math.max(0, Math.min(100, +input.value || 0));
       const total = signedTotal();
       const label = $("#w-total");
+      if (!label) return;
       label.textContent = total + "%";
-      label.parentElement.style.color =
-        total === 100 ? "var(--good)" : total > 100 ? "var(--bad)" : "var(--warn)";
+      label.style.color = total === 100 ? "var(--good)" : total > 100 ? "var(--bad)" : "var(--warn)";
     });
   });
 
   $("[data-wiz='back']").addEventListener("click", back);
   $("[data-wiz='next']").addEventListener("click", next);
+}
+
+/** Put a market on the slip, clear the search, and hand focus to its line. */
+function addMarket(name) {
+  if (!(name in draft.markets)) draft.markets[name] = 0;
+  marketQuery = "";
+  repaintPanel();
+  $(`[data-m="${CSS.escape(name)}"]`)?.focus();
+}
+
+/** Repaint step 3 in place — the modal shell and footer stay as they are. */
+function repaintPanel() {
+  const search = $("#w-market-search");
+  if (search) search.value = marketQuery;
+  mount("#w-market-results", marketResults(marketQuery));
+  mount("#w-market-selected", selectedMarkets());
+  const total = signedTotal();
+  const label = $("#w-total");
+  if (label) {
+    label.textContent = total + "%";
+    label.style.color = total === 100 ? "var(--good)" : total > 100 ? "var(--bad)" : "var(--warn)";
+  }
+  wire();
 }
 
 const repaint = () => updateModal(shell(), { onMount: wire });
@@ -263,7 +362,18 @@ function back() {
 
 function next() {
   if (step === 0) {
-    draft.cedant = $("#w-cedant").value;
+    const typed = $("#w-cedant").value.trim();
+    // A slip has to name a cedant the registry knows, or nothing downstream —
+    // the KYC gate, the portal, the technical account — can resolve it.
+    const match = state.cedants.find((c) => c.name.toLowerCase() === typed.toLowerCase());
+    if (!match) {
+      $("#w-cedant").closest(".field").classList.add("has-error");
+      $("#w-cedant-hint").outerHTML =
+        `<div class="field-error" id="w-cedant-hint">${typed ? `"${typed}" is not on the registry. Add them under Registry → Cedants first.` : "Choose a cedant."}</div>`;
+      $("#w-cedant").focus();
+      return;
+    }
+    draft.cedant = match.name;
     draft.cls = $("#w-class").value;
     draft.type = $("#w-type").value;
     draft.uwy = $("#w-uwy").value;
@@ -293,6 +403,7 @@ function next() {
 export function openWizard(onIssue) {
   step = 0;
   draft = { type: "Facultative", markets: {} };
+  marketQuery = "";
   onIssued = onIssue || null;
   openModal(shell(), { onMount: wire });
 }

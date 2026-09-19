@@ -66,7 +66,7 @@ export const COLLATERAL_TYPES = [
 
 export const SETTLEMENT_CURRENCIES = ["USD", "EUR", "GBP", "CAD", "SGD", "IDR", "MYR", "THB", "AUD", "JPY"];
 export const PAYMENT_TERMS = ["30 days", "45 days", "60 days", "90 days", "Quarterly in arrears", "At inception"];
-export const KYC_STATUSES = ["Current", "Review due"];
+export const KYC_STATUSES = ["Current", "Review due", "Not assessed"];
 export const COUNTERPARTY_STATUSES = ["Active", "Review due", "Suspended"];
 
 /* ---------- reusable field builders ---------- */

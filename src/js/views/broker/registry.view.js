@@ -12,7 +12,7 @@
  * factory. Adding a category means adding an entry to REGISTRY_CATEGORIES and a
  * nav entry in core/navigation.js.
  */
-import { mount, onAction } from "../../core/dom.js";
+import { $, mount, onAction } from "../../core/dom.js";
 import { on, TOPICS } from "../../core/events.js";
 import { state, reinsuranceCompanies, lloydsSyndicates, allCounterparties } from "../../core/store.js";
 import { fieldsFor } from "./registry-fields.js";
@@ -46,8 +46,11 @@ export const REGISTRY_CATEGORIES = [
     // KYC state reuses the shared status vocabulary rather than inventing tones.
     row: (c) => registryRow(
       c.name,
-      `${c.country} · KYC refreshed ${c.refreshed}`,
-      statusPill(c.kyc === "Current" ? "Bound" : "Renewal Due") + codeBadge(c),
+      [c.country, c.licenceCategory, c.refreshed ? `KYC refreshed ${c.refreshed}` : null]
+        .filter(Boolean).join(" · "),
+      // "Current" reads as good; "Review due" warns; "Not assessed" is neutral
+      // — imported records have simply never been onboarded.
+      statusPill(c.kyc === "Current" ? "Active" : c.kyc) + codeBadge(c),
       contactLine(c),
     ),
   },
@@ -117,7 +120,19 @@ export const REGISTRY_CATEGORIES = [
  * Build a registry page from its category definition.
  * @param {RegistryCategory} category
  */
+/**
+ * Everything on a record that a person might search by. Built from the values
+ * rather than a named list, so a field added to the schema is searchable
+ * without anyone remembering to update this.
+ */
+const searchText = (entry) => Object.values(entry)
+  .filter((v) => typeof v === "string")
+  .join(" ")
+  .toLowerCase();
+
 export function createRegistryView(category) {
+  /** Reset per mount, so switching pages does not carry a stale filter. */
+  let query = "";
   /** Countries already on the registry, offered as type-ahead suggestions so
    *  the book does not drift into "USA" and "United States" as two places. */
   const knownCountries = () =>
@@ -156,19 +171,41 @@ export function createRegistryView(category) {
           <button class="btn primary" data-action="add">${icons.plus}${category.addLabel}</button>
         </div>
       </div>
+      <div class="toolbar">
+        <input type="search" class="reg-search" id="${category.id}-search"
+          placeholder="Search ${category.unit} by name, country or role"
+          aria-label="Search ${category.title}">
+      </div>
       <div class="reg-page" id="${category.id}-list"></div>
     </section>`,
 
     mount() {
       onAction("#view-root", { add: openAddForm });
+      query = "";
+      $(`#${category.id}-search`)?.addEventListener("input", (e) => {
+        query = e.target.value.trim().toLowerCase();
+        view.refresh();
+      });
     },
 
     refresh() {
-      const entries = category.entries();
-      mount(`#${category.id}-list`, entries.length
-        ? `<div class="reg-list">${entries.map(category.row).join("")}</div>`
-        : emptyState(`No ${category.unit} on file yet.`));
-      mount(`#${category.id}-count`, `${entries.length} ${category.unit}`);
+      const all = category.entries();
+      const terms = query.split(/\s+/).filter(Boolean);
+      // Every term must appear somewhere, so "re indonesia" narrows rather
+      // than widening the way a match-any search would.
+      const shown = terms.length
+        ? all.filter((e) => { const hay = searchText(e); return terms.every((t) => hay.includes(t)); })
+        : all;
+
+      mount(`#${category.id}-list`, shown.length
+        ? `<div class="reg-list">${shown.map(category.row).join("")}</div>`
+        : emptyState(terms.length
+            ? `No ${category.unit} match "${query}".`
+            : `No ${category.unit} on file yet.`));
+
+      mount(`#${category.id}-count`, terms.length
+        ? `${shown.length} of ${all.length} ${category.unit}`
+        : `${all.length} ${category.unit}`);
     },
   };
 

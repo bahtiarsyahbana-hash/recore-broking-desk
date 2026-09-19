@@ -107,6 +107,13 @@ Reinsurance, Lloyd's Syndicates, Reinsurance Brokers and Others. They are kept
 apart because the categories are not interchangeable — what a counterparty may
 do on a slip depends on which one it sits in.
 
+The registry holds **651 imported counterparties** — SEA cedants, global and
+offshore reinsurers, Lloyd's syndicates and Indonesian broking partners — on top
+of the demo book. Every page is searchable; imported cedants show `Not assessed`
+KYC until somebody onboards them, and the slip release gate refuses to place for
+them until then. See [scripts/import/](scripts/import/README.md) to regenerate
+from a reissued workbook.
+
 Each page has its own add-form, asking only for what that category needs. A
 small required set sits above collapsible optional sections for contacts,
 settlement terms and security — see
