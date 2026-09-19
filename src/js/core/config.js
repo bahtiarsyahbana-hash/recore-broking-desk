@@ -22,9 +22,19 @@ export const RENEWAL_HORIZON_DAYS = 60;
 /** Renewals inside this many days are shown as urgent. */
 export const RENEWAL_URGENT_DAYS = 30;
 
-/** Colours used by the SVG charts and the XoL tower. */
-export const CHART_COLORS = ["#1f6f78", "#a97a2f", "#3a5f8a", "#b1701c"];
-export const TOWER_COLORS = ["#b1701c", "#1f6f78", "#3a5f8a", "#a97a2f", "#7a5aa8"];
+/**
+ * Chart palette, drawn from the brand. Categorical, so the four are chosen to
+ * separate by lightness as well as hue — they must still be tellable apart in
+ * greyscale or for a colour-blind reader.
+ */
+export const CHART_COLORS = ["#0a369d", "#001233", "#4a73c8", "#8a93a5"];
+
+/**
+ * The XoL tower ramps navy → blue from the bottom up, so height itself carries
+ * meaning: the dark, expensive working layers sit at the base and the cheap
+ * catastrophe layers lighten towards the top.
+ */
+export const TOWER_COLORS = ["#001233", "#0a369d", "#2e5ac4", "#5b82db", "#93aee9"];
 
 /** The cedant whose book the optional portal exposes. */
 export const PORTAL_CEDANT = "Meridian Mutual Insurance";

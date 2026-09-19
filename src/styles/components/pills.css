@@ -9,5 +9,5 @@
 .type-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.02em; }
 .type-badge.fac{ background:var(--info-tint); color:var(--info); }
 .type-badge.qs{ background:var(--marine-tint); color:var(--marine-ink); }
-.type-badge.surplus{ background:var(--brass-tint); color:var(--brass); }
+.type-badge.surplus{ background:var(--graphite-tint); color:var(--graphite); }
 .type-badge.xol{ background:var(--warn-tint); color:var(--warn); }

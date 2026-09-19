@@ -1,32 +1,62 @@
 /* Design tokens — colour, type, elevation. The single source of truth for theming.
-   Light is the fixed default; the dark palette stays available behind data-theme="dark". */
+
+   Brand palette
+     Navy Blue   #001233   the hero colour: body text on light, the canvas on dark
+     Blue        #0A369D   the accent: primary actions, active state, links
+     Gray        #E2E2E2   dividers and the strong-neutral tint
+     Concrete    #F2F2F2   subtle surface fills
+     Dark Gray   #161717   the strong neutral, used where a second accent is needed
+
+   Status colours (good / warn / bad) are deliberately NOT brand colours. They
+   carry meaning — confirmed, queried, exception — and a red that is not red
+   stops communicating. They are tuned to sit beside the brand, not replaced.
+
+   Light is the fixed default; the dark palette stays available behind
+   data-theme="dark". */
 :root{
-  --ink:#10192b; --ink-soft:#3a4457;
-  --bg:#ffffff; --surface:#ffffff; --surface-2:#f3f4f6;
-  --line:rgba(16,25,43,.12); --line-soft:rgba(16,25,43,.07);
-  --marine:#1f6f78; --marine-ink:#123f45; --marine-tint:#e2eeee;
-  --brass:#a97a2f; --brass-tint:#f3e6cd;
-  --good:#1e7a4c; --good-tint:#e2f1e7;
-  --warn:#b1701c; --warn-tint:#f7ecd8;
-  --bad:#a83a3a; --bad-tint:#f6e3e1;
-  --info:#3a5f8a; --info-tint:#e5ecf5;
-  --shadow: 0 1px 2px rgba(16,25,43,.05), 0 6px 20px -10px rgba(16,25,43,.14);
+  /* Navy carries the text, which is what makes the whole app read as the brand
+     rather than only its buttons. */
+  --ink:#001233; --ink-soft:#616c80;
+  --bg:#ffffff; --surface:#ffffff; --surface-2:#f2f2f2;
+  --line:#e2e2e2; --line-soft:#ededed;
+
+  /* Primary accent. The token is still called `marine` because every component
+     references it; only its value is the brand's. */
+  --marine:#0a369d; --marine-ink:#001233; --marine-tint:#e7ebf5;
+
+  /* Second accent. The brand has no gold, so the strong neutral takes the role
+     the old brass had — distinct from the blues without inventing a colour. */
+  --graphite:#161717; --graphite-tint:#e2e2e2;
+
+  --good:#1e7a4c; --good-tint:#e4f1ea;
+  --warn:#9a6212; --warn-tint:#f6ecda;
+  --bad:#a8302f;  --bad-tint:#f7e4e3;
+  --info:#3a5f8a; --info-tint:#e8edf4;
+
+  --shadow: 0 1px 2px rgba(0,18,51,.06), 0 6px 20px -10px rgba(0,18,51,.20);
   --radius: 10px;
   color-scheme: light;
 }
 /* Bright/white theme is the fixed default for presentation and daily-use consistency —
    it no longer follows the OS's prefers-color-scheme. The dark palette below stays
-   available behind an explicit data-theme="dark" attribute if a manual toggle is added later. */
+   available behind an explicit data-theme="dark" attribute if a manual toggle is added later.
+
+   On dark, Navy Blue becomes the canvas rather than the ink — the brand's own
+   hero colour doing the work a neutral charcoal would otherwise do. */
 :root[data-theme="dark"]{
-  --ink:#e9e6db; --ink-soft:#aab1c2;
-  --bg:#0c1220; --surface:#131b2c; --surface-2:#1a2338;
-  --line:rgba(233,230,219,.14); --line-soft:rgba(233,230,219,.08);
-  --marine:#4fb3ba; --marine-ink:#bfe7e9; --marine-tint:#12313a;
-  --brass:#d9a354; --brass-tint:#332510;
-  --good:#4fbf82; --good-tint:#123522;
-  --warn:#e0a13f; --warn-tint:#3a2b10;
-  --bad:#e2827c; --bad-tint:#3a1c1c;
-  --info:#8fb0d8; --info-tint:#1a2740;
+  --ink:#f2f2f2; --ink-soft:#a3aec4;
+  --bg:#001233; --surface:#041b45; --surface-2:#0a2456;
+  --line:rgba(226,226,226,.16); --line-soft:rgba(226,226,226,.09);
+
+  /* Lifted so the accent still carries contrast against a navy canvas. */
+  --marine:#5b84e0; --marine-ink:#c9d8f7; --marine-tint:#0c2b6b;
+  --graphite:#c9ccd1; --graphite-tint:#20283f;
+
+  --good:#4fbf82; --good-tint:#0d3323;
+  --warn:#e0a13f; --warn-tint:#39290f;
+  --bad:#e2827c;  --bad-tint:#3a1b1b;
+  --info:#8fb0d8; --info-tint:#12294a;
+
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -10px rgba(0,0,0,.6);
   color-scheme: dark;
 }
