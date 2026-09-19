@@ -1,5 +1,5 @@
 /**
- * Static dev server for the ReCore prototype.
+ * Static dev server for the Recordes prototype.
  *
  * The app is plain ES modules with no build step — it only needs to be served
  * over HTTP rather than opened from the filesystem. Zero dependencies, so
@@ -66,7 +66,7 @@ async function handler(req, res) {
   }
 }
 
-console.log(`ReCore Broking Desk → http://localhost:${PORT}`);
+console.log(`Recordes Reinsurance Broking Desk → http://localhost:${PORT}`);
 console.log(`serving ${ROOT}`);
 
 for (const host of HOSTS) {

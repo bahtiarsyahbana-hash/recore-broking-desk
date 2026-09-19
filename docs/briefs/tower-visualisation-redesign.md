@@ -8,7 +8,7 @@ dropped straight into the codebase.
 
 ## 1. What this is
 
-ReCore is a reinsurance broking application. This task is to redesign **one
+Recordes is a reinsurance broking application. This task is to redesign **one
 component**: the layer-tower visualisation on the Treaty Engine's *Excess of
 Loss* tab.
 

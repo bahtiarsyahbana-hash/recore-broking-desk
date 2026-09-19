@@ -46,8 +46,8 @@ function screen(error) {
       <div class="login-brand">
         <div class="mark">R</div>
         <div>
-          <div class="name">ReCore</div>
-          <div class="sub">Meridian Bridge Re Brokers</div>
+          <div class="name">Recordes</div>
+          <div class="sub">Reinsurance Broking Desk</div>
         </div>
       </div>
 

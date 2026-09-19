@@ -1,9 +1,9 @@
 {
-  "name": "recore-broking-desk",
+  "name": "recordes-reinsurance-broking-desk",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Reinsurance broker core system — placement, treaty engine, bordereaux, claims, accounting and an optional cedant portal.",
+  "description": "Recordes Reinsurance Broking Desk \u2014 facultative and treaty placement, treaty calculation engine, bordereaux, claims, accounting and an optional cedant portal.",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "start": "node scripts/dev-server.mjs"

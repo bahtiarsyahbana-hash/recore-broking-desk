@@ -1,5 +1,5 @@
 /**
- * ReCore Broking Desk — application bootstrap.
+ * Recordes Reinsurance Broking Desk — application bootstrap.
  *
  * Wiring order matters: the modal host and shell chrome must exist before any
  * view renders, and views must be registered before a role is selected.

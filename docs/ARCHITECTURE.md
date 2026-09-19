@@ -1,4 +1,4 @@
-# ReCore Broking Desk — Architecture
+# Recordes Reinsurance Broking Desk — Architecture
 
 The prototype was one 1,513-line HTML file. This document describes the structure
 it was split into, and the rules that keep it that way as the system grows.

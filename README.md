@@ -1,4 +1,4 @@
-# ReCore Broking Desk
+# Recordes Reinsurance Broking Desk
 
 Interactive prototype of a reinsurance broker core system — facultative and
 treaty placement, quota share / surplus / excess-of-loss calculators, bordereaux,
@@ -64,7 +64,7 @@ scripts/
 docs/
   ARCHITECTURE.md         the layering rules and how to extend the system
   COUNTERPARTY-FIELDS.md  what the registry forms capture, and the sources why
-ReCore-Broking-Desk.html  the original single-file prototype, kept for reference
+Recordes-Broking-Desk.html  the original single-file prototype, kept for reference
 ```
 
 ## What the desk does
