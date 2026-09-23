@@ -21,6 +21,9 @@ import { icons } from "../../ui/icons.js";
 import { openFormModal } from "../../ui/form-modal.js";
 import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 import { addCounterparty, validateCounterparty } from "../../services/registry.service.js";
+import { openCounterpartyDetail } from "../../ui/counterparty-detail.js";
+import { openProgramDetail } from "../../ui/program-detail.js";
+import { showView } from "../../core/router.js";
 
 /**
  * @typedef {object} RegistryCategory
@@ -155,9 +158,15 @@ export function createRegistryView(category) {
       submitLabel: category.addLabel,
       // Field-level rules run first; this is the cross-record uniqueness check.
       validate: (values) => validateCounterparty(category.id, values),
-      onSubmit: (values) => addCounterparty(category.id, { ...values, ...fixed }),
+      onSubmit: (values) => {
+        const stored = addCounterparty(category.id, { ...values, ...fixed });
+        // Straight into the record, so bank details and PICs can be added now.
+        openEntry(stored.name);
+      },
     });
   }
+
+  const openEntry = (name) => openCounterpartyDetail(name, (programId) => { showView("placements"); openProgramDetail(programId); });
 
   const view = {
     id: category.id,
@@ -166,7 +175,7 @@ export function createRegistryView(category) {
       <div class="view-head">
         <div>
           <h1>${category.title}</h1>
-          <p>${category.intro}</p>
+          <p>${category.intro} Open any entry to view or manage its company profile, bank details and people in charge by division.</p>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           <span class="chip" id="${category.id}-count"></span>
@@ -182,7 +191,18 @@ export function createRegistryView(category) {
     </section>`,
 
     mount() {
-      onAction("#view-root", { add: openAddForm });
+      onAction("#view-root", {
+        add: openAddForm,
+        "open-entry": ({ name }, trigger, e) => {
+          // A mailto link inside the row is a link, not an open.
+          if (e?.target?.closest("a")) return;
+          openEntry(name);
+        },
+      });
+      $("#view-root")?.addEventListener("keydown", (e) => {
+        const t = e.target.closest?.("[data-action='open-entry']");
+        if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openEntry(t.dataset.name); }
+      });
       query = "";
       pager.reset();
       pager.wire("#view-root");

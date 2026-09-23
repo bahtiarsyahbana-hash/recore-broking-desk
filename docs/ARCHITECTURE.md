@@ -151,6 +151,15 @@ A draft is internal bookkeeping; releasing a slip puts the firm's name in front
 of the market. So `releaseSlip` is guarded by `slip-approval.js` and re-checks
 every condition at the moment of release rather than trusting the submit step.
 
+`registry.service.js` also owns the counterparty **profile**: `updateCounterparty`
+edits the company profile (never the name), and `addPic` / `updatePic` /
+`removePic` and `addBankAccount` / `updateBankAccount` / `removeBankAccount`
+maintain the people in charge — several per division, one primary per
+division — and the settlement accounts, one primary. The rules live in
+`domain/counterparty-profile.js`, which also folds the earlier single-contact
+fields into the PIC list on read so nothing is migrated. `ui/counterparty-detail.js`
+is the drawer every registry row opens.
+
 `registry.service.js` guards the one invariant the whole system rests on:
 **counterparty names are unique across every category.** A program's `cedant`, a
 market confirmation's `m` and a finance document's `counterparty` all point at a

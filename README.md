@@ -135,7 +135,12 @@ the cedant's instruction to bind is not.
 Binding freezes the terms and issues the RI slip and binding slips, each with a
 delivery status.
 
-Tests: `npm test` runs the domain rules (lifecycle, panel capacity, intake)
+Every **Registry** entry opens to a drawer where the desk views or manages the
+company profile, the bank accounts settlement runs through, and the people in
+charge grouped by the division they handle — placement, claims, technical
+accounting, compliance, management — with several people allowed per division.
+
+Tests: `npm test` runs the domain rules (lifecycle, panel capacity, intake, registry profile)
 with Node's built-in test runner; there are no dependencies.
 
 The dashboard shows **concentration** alongside the totals: premium by cedant

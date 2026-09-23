@@ -35,3 +35,23 @@ tbody tr.is-idle td{ color:var(--ink-soft); }
 /* Registry search. With several hundred counterparties on a page, the filter
    is not a convenience — it is how the page is used at all. */
 .reg-search{ max-width:360px; }
+
+/* Registry rows open a drawer; the affordance appears on hover and focus. */
+.reg-row-open{ cursor:pointer; position:relative; }
+.reg-row-open:hover, .reg-row-open:focus-visible{ background:var(--marine-tint); outline:none; }
+.reg-open{ flex:none; font-size:11px; font-weight:600; color:var(--marine); opacity:0; transition:opacity .15s; }
+.reg-row-open:hover .reg-open, .reg-row-open:focus-visible .reg-open{ opacity:1; }
+
+/* Counterparty drawer: profile rows for bank accounts and PICs. */
+.prof-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid var(--line-soft); font-size:12.5px; }
+.prof-row:last-child{ border-bottom:none; }
+.prof-main{ min-width:0; flex:1; }
+.prof-name{ font-weight:600; color:var(--ink); display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.prof-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; overflow-wrap:anywhere; }
+.prof-meta a{ color:var(--marine); text-decoration:none; }
+.prof-actions{ display:flex; gap:4px; flex:none; }
+.prof-actions .btn{ padding:3px 8px; font-size:11px; }
+.prof-division{
+  display:flex; align-items:center; gap:8px; padding:8px 14px 4px; font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); background:var(--surface-2);
+}

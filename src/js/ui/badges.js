@@ -58,13 +58,15 @@ export function financeBadge(type) {
 
 /** A compact name + meta row used by the registry pages. */
 export function registryRow(name, meta, sideHtml = "", contactHtml = "") {
-  return `<div class="reg-row">
+  const key = String(name).replace(/"/g, "&quot;");
+  return `<div class="reg-row reg-row-open" data-action="open-entry" data-name="${key}" role="button" tabindex="0" aria-label="Open ${key}">
     <div class="reg-main">
       <div class="reg-name">${name}</div>
       <div class="reg-meta">${meta}</div>
       ${contactHtml ? `<div class="reg-contact">${contactHtml}</div>` : ""}
     </div>
     ${sideHtml ? `<div class="reg-side">${sideHtml}</div>` : ""}
+    <span class="reg-open" aria-hidden="true">Manage →</span>
   </div>`;
 }
 
@@ -75,6 +77,16 @@ export function registryRow(name, meta, sideHtml = "", contactHtml = "") {
  */
 export function contactLine(entry) {
   const parts = [];
+  const structured = Array.isArray(entry.pics) ? entry.pics : [];
+  const banks = Array.isArray(entry.bankAccounts) ? entry.bankAccounts.length : 0;
+  if (structured.length) {
+    const primary = structured.find((p) => p.primary) || structured[0];
+    const divisions = new Set(structured.map((p) => p.division));
+    parts.push(`<span class="pic">${primary.name}</span>${primary.title ? ` · ${primary.title}` : ""} · ${structured.length} PIC${structured.length === 1 ? "" : "s"}, ${divisions.size} division${divisions.size === 1 ? "" : "s"}`);
+    if (primary.email) parts.push(`<a href="mailto:${primary.email}">${primary.email}</a>`);
+    if (banks) parts.push(`${banks} bank account${banks === 1 ? "" : "s"}`);
+    return parts.join(" · ");
+  }
   if (entry.contactName) {
     parts.push(`<span class="pic">${entry.contactName}</span>${
       entry.contactTitle ? ` · ${entry.contactTitle}` : ""}`);
@@ -83,6 +95,7 @@ export function contactLine(entry) {
     parts.push(`<a href="mailto:${entry.contactEmail}">${entry.contactEmail}</a>`);
   }
   if (entry.contactPhone) parts.push(entry.contactPhone);
+  if (banks) parts.push(`${banks} bank account${banks === 1 ? "" : "s"}`);
   return parts.join(" · ");
 }
 
