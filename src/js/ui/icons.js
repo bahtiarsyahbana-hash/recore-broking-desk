@@ -20,6 +20,7 @@ export const icons = {
   syndicate: svg('<path d="M12 3.5v4M8.5 7.5h7"/><path d="M12 7.5 5 10.5M12 7.5l7 3"/><path d="M5 10.5c0 2 1.1 3.2 2.5 3.2S10 12.5 10 10.5M14 10.5c0 2 1.1 3.2 2.5 3.2S19 12.5 19 10.5"/><path d="M12 7.5v11M8 20.5h8"/>'),
   brokers: svg('<circle cx="8" cy="8.5" r="2.8"/><circle cx="16" cy="8.5" r="2.8"/><path d="M2.5 19c0-2.8 2.5-4.8 5.5-4.8s5.5 2 5.5 4.8M14 14.4c2.8.2 5 2.1 5 4.6"/>'),
   others: svg('<circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/>'),
+  inbox: svg('<path d="M3.5 13.5h4.6l1.4 2.5h5l1.4-2.5h4.6"/><path d="M5.5 5.5h13l2 8v5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5l2-8Z"/>'),
   folder: svg('<path d="M3.5 7.5h6l1.6 2h9.4v10.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V7.5Z"/>'),
   plusCircle: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/>'),
   upload: svg('<path d="M12 15.5V4.5M8 8.5 12 4.5 16 8.5"/><path d="M4.5 15.5v3a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-3"/>'),

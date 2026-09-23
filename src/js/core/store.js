@@ -12,6 +12,7 @@ import { programs as seedPrograms } from "../data/programs.data.js";
 import { bordereaux as seedBordereaux } from "../data/bordereaux.data.js";
 import { claims as seedClaims } from "../data/claims.data.js";
 import { financeDocs as seedFinanceDocs } from "../data/finance.data.js";
+import { intakes as seedIntakes } from "../data/intakes.data.js";
 import { PORTAL_CEDANT } from "./config.js";
 import {
   cedants as seedCedants, markets as seedMarkets,
@@ -53,6 +54,12 @@ export const state = {
   markets: register(seedMarkets, referenceReinsurers, referenceSyndicates),
   brokers: register(seedBrokers, referenceBrokers),
   others: register(seedOthers, referenceOthers),
+  /**
+   * The broker intake queue — every request for cover before it is a
+   * placement, whatever channel it arrived by. Mutated only through
+   * services/intake.service.js.
+   */
+  intakes: seedIntakes.map((i) => ({ ...i, history: [...(i.history || [])] })),
   /** Risks the cedant portal has sent that the desk has not yet picked up. */
   pendingSubmissions: [],
   /**
@@ -83,12 +90,17 @@ export const sequences = {
   claim: 5,
   bordereau: 5,
   program: 1008,
+  intake: 1003,
 };
 
 export const nextInvoiceNo = () => "INV-" + sequences.invoice++;
 export const nextCreditNoteNo = () => "CN-" + String(sequences.creditNote++).padStart(4, "0");
 export const nextDebitNoteNo = () => "DN-" + String(sequences.debitNote++).padStart(4, "0");
 export const nextProgramId = () => "P-" + sequences.program++;
+export const nextIntakeId = () => "IN-" + sequences.intake++;
+
+/** Look an intake up by its id. */
+export const intakeById = (id) => state.intakes.find((i) => i.id === id);
 
 /** A cedant's registry record, by the name a program refers to it by. */
 export const cedantNamed = (name) =>

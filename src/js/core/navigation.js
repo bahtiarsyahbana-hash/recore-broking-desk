@@ -17,6 +17,7 @@ export const ROLES = {
 export const brokerNav = [
   { section: "Broker Desk" },
   { view: "dashboard",   label: "Dashboard",     icon: icons.dashboard },
+  { view: "intake",      label: "Intake",        icon: icons.inbox },
   { view: "placements",  label: "Placements",    icon: icons.placements },
   { view: "treaty",      label: "Treaty Engine", icon: icons.treaty },
   { view: "bordereaux",  label: "Bordereaux",    icon: icons.bordereaux },

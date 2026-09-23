@@ -6,6 +6,7 @@
  */
 import { dashboardView } from "./broker/dashboard.view.js";
 import { placementsView } from "./broker/placements.view.js";
+import { intakeView } from "./broker/intake.view.js";
 import { treatyView } from "./broker/treaty.view.js";
 import { bordereauxView } from "./broker/bordereaux.view.js";
 import { claimsView } from "./broker/claims.view.js";
@@ -20,6 +21,7 @@ import { cedantStatementView } from "./cedant/statement.view.js";
 
 export const allViews = [
   dashboardView,
+  intakeView,
   placementsView,
   treatyView,
   bordereauxView,

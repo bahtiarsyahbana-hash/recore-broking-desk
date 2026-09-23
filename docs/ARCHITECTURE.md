@@ -65,13 +65,33 @@ where the business is, and it is the layer worth unit-testing first.
   line, tower geometry and reinstatement premium
 - `technical-account.js` — the running account per program, and the default
   cession/commission rates by treaty type
-- `lifecycle.js` — the placement state machine: the five steps, `canBind`, the
-  status implied by a confirmation round, and the **operator guidance**
-  (`nextAction`, `bindChecklist`, `confirmationProgress`) that turns that state
-  into "here is what to do now and what is blocking it". The guidance lives
-  beside the rules rather than in the drawer, so the two cannot drift, and
-  `nextAction` always reports the same step number as the journey rail —
-  `stepIndexFor(status)` is the single source of truth for position.
+- `lifecycle.js` — the placement state machine. Six Kanban stages
+  (`LIFECYCLE_STEPS`: Intake, Draft Slip, Market Negotiation, Proposal Sent,
+  Cedant Approved, Bound Issued) over eleven canonical statuses (`STATUS`), with
+  `stageOf(program)` giving column, index and substatus badge. It keeps four
+  things apart: market backup (`Backup Secured`, derived from confirmed lines)
+  is not cedant approval; cedant approval (`Cedant Approved`, awaiting
+  instruction) is not an instruction to bind (`Bind Instructed`, recorded with a
+  reference); binding is a separate act; and the four-eyes release gate sits
+  between Draft Slip and Placed to Market. `normaliseStatus` maps the statuses
+  earlier versions wrote — Slip Issued → Placed to Market, Negotiating →
+  Market Negotiation, Cedant Approval → Proposal Sent — on read, so seeded and
+  historical records are never rewritten. The **operator guidance**
+  (`nextAction`, `bindChecklist`) lives beside the rules so the two cannot
+  drift; `stepIndexFor(status)` is the single source of truth for position.
+- `panel.js` — the market panel as capacity. One vocabulary for a horizontal
+  quota-share panel (`marketConfirmations`) and a layered excess-of-loss tower
+  (`layers[].markets`, flattened into `marketConfirmations` with a `layer`
+  index). `capacityUnits` yields one unit per slip or per layer, each of which
+  must reach exactly 100% signed and 100% confirmed on its own; market response
+  statuses (Sent → Reviewing → Quoted/Queried → Confirmed/Declined) and the
+  moves a broker may record between them.
+- `intake.js` — the intake queue rules: statuses Draft → Received → Under
+  Review → Accepted / Revision Requested / Declined → Converted to Placement,
+  readiness for acceptance, and `intakeToDraft`, the copy handed to the
+  placement so the intake stays immutable. New placements are Quota Share or
+  Excess of Loss only (`PLACEMENT_TYPES`); payment warranty is one of 15, 30,
+  45, 60 or 90 days (`PAYMENT_WARRANTY_DAYS`).
 - `portfolio.js` — book-level analytics: totals, premium by class, loss ratios,
   renewals due, and **concentration** — premium by cedant, exposure by
   reinsurer, and `concentration()`, which ranks any `{name: amount}` map into
@@ -99,8 +119,32 @@ records the paper trail, raises any finance document the transition implies, and
 **publishes what changed** on the event bus. Views never mutate state directly.
 
 `placement.service.js` is the spine: `saveDraft` → `submitForApproval` →
-`releaseSlip` → `addDocument` → `approveAndBind` → `startRenewal`, which loops
-back to the top. `returnToDraft` sends a submission back to its preparer.
+`releaseSlip` (place to market) → `recordMarketResponse` (one line at a time,
+until Backup Secured is derived) → `recordProposalSent` → `recordCedantApproval`
+or `recordCedantRevision` → `recordBindInstruction` → `executeBinding` →
+`startRenewal`, which loops back to the top. `returnToDraft` sends a submission
+back to its preparer; `reviseSlip` takes an in-market slip back to Draft as a
+new slip version, resetting every response and invalidating any cedant approval
+or bind instruction. A market response recorded after a proposal has gone to
+the cedant marks that proposal stale, voids the approval and any instruction to
+bind, and drops the placement back to the market stage the panel now supports;
+restoring the capacity later does not revive them — a new proposal version and
+a new approval are required. After "Cedant requested revision" the same terms
+cannot go back as a new proposal: `revisionRequired` stays set until
+`reviseSlip` has produced a new slip version. A slip cannot be submitted or
+placed without an agreed payment warranty (`paymentWarrantyCheck`); the value is
+never defaulted, and the period's start date is deliberately not modelled.
+Nothing simulates a counterparty: a market's response is what a broker recorded. Every write appends to `program.history`
+(actor, timestamp, action, notes, slip and proposal version). `executeBinding`
+freezes the agreed terms in `boundTerms`, issues an RI Slip to the cedant and a
+Binding Slip to each reinsurer (type, version, recipient, issue date, issuer,
+delivery status), then raises the market invoice as before.
+
+`intake.service.js` owns the broker intake queue. `createManualIntake` records
+a request that arrived by email, phone, WhatsApp or meeting; `createPortalIntake`
+is what the cedant portal's Submit a Risk now calls. `acceptIntake` freezes the
+intake, creates a Draft Slip through `createDraftFromIntake` with a copy of the
+data, and cross-references the two.
 
 **Preparation and release are separate acts**, and that separation is the point.
 A draft is internal bookkeeping; releasing a slip puts the firm's name in front

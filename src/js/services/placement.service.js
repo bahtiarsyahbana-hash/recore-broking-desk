@@ -2,226 +2,498 @@
  * Placement service — every write to the placement book goes through here.
  *
  * Each operation applies the lifecycle rules from domain/lifecycle.js, records
- * the paper trail on the program, raises any finance document the transition
- * implies, and publishes what changed. Views never mutate a program directly.
+ * the paper trail on the program (history, documents, versions), raises any
+ * finance document the transition implies, and publishes what changed. Views
+ * never mutate a program directly.
+ *
+ * Nothing here simulates a counterparty. Markets and cedants answer in the
+ * real world; a broker records what they said.
  */
 import { state, programById, nextProgramId, currentUser, cedantNamed } from "../core/store.js";
 import { todayISO, TODAY } from "../core/config.js";
 import { emit, TOPICS } from "../core/events.js";
-import { canBind, statusAfterConfirmationRound } from "../domain/lifecycle.js";
+import {
+  STATUS, normaliseStatus, canBind, statusAfterMarketResponse, isPreMarket, isWithCedant,
+  statusAfterPanelChangeWithCedant,
+  canSendProposal, canRecordCedantDecision, canRecordCedantRevision, canRecordBindInstruction,
+} from "../domain/lifecycle.js";
+import { isValidPaymentWarranty } from "../domain/intake.js";
 import { stamp, usedOverride } from "../domain/authority.js";
 import { canReleaseSlip, readyToSubmit } from "../domain/slip-approval.js";
+import { isLayered, panelEntries, panelMarkets, canRecordResponse, backupSecured } from "../domain/panel.js";
 import { cessionRate } from "../domain/technical-account.js";
+import { structureLine, estimatedGrossPremium } from "../domain/placement-terms.js";
 import { raiseInvoice } from "./finance.service.js";
 
+/* ---- paper trail ------------------------------------------------------ */
+
+const actorName = () => currentUser()?.name || "Desk";
+
+/** Append an audit line: who did what, when, against which version. */
+function record(p, action, notes = "", extra = {}) {
+  p.history = p.history || [];
+  p.history.push({
+    at: todayISO(), actor: actorName(), action, notes: notes || "",
+    slipVersion: p.slipVersion || 1, proposalVersion: p.proposalVersion || 0, ...extra,
+  });
+}
+
+/** File a document against the placement. Newest first, as the dropbox reads. */
+function file(p, doc) {
+  p.documents = p.documents || [];
+  p.documents.unshift({ date: todayISO(), from: actorName(), delivery: "Filed", ...doc });
+  return p.documents[0];
+}
+
+/** Every allocation, whichever shape the panel is stored in. */
+const entries = (p) => panelEntries(p);
+
+/** Keep the flat confirmations array in step with a layered tower. */
+function syncFlat(p) {
+  if (isLayered(p)) p.marketConfirmations = p.layers.flatMap((l, i) => (l.markets || []).map((mc) => ({ ...mc, layer: i })));
+}
+
+/** Find one allocation: by market, and by layer for a tower. */
+function allocation(p, market, layer) {
+  if (isLayered(p)) {
+    const l = p.layers[Number(layer) || 0];
+    return l ? (l.markets || []).find((mc) => mc.m === market) : null;
+  }
+  return (p.marketConfirmations || []).find((mc) => mc.m === market);
+}
+
+/* ---- drafting --------------------------------------------------------- */
+
 /**
- * Re-open an expiring program at Issue Slip, pre-populated from expiring terms.
- * This is what makes the lifecycle loop rather than end at Bound.
+ * Re-open an expiring program as a Draft Slip, pre-populated from the expiring
+ * terms. This is what makes the lifecycle loop rather than end at Bound. A
+ * renewal is a new slip on new terms, so it goes back through the four-eyes
+ * gate rather than inheriting the expiring placement's release.
  */
 export function startRenewal(id) {
   const p = programById(id);
   if (!p) return null;
-  // A renewal is a new slip on new terms, so it goes back through the gate
-  // rather than inheriting the expiring placement's release.
-  p.status = "Draft";
+  p.status = STATUS.DRAFT;
   p.preparedBy = stamp(currentUser());
   p.approvedBy = null;
-  p.marketConfirmations.forEach((mc) => { mc.s = "Sent"; });
-  p.documents.unshift({
-    name: "Renewal slip — drafted.pdf", from: "Broker", date: todayISO(), type: "Slip",
-  });
+  p.slipVersion = (p.slipVersion || 1) + 1;
+  p.proposalVersion = 0;
+  p.cedantApproval = null;
+  p.bindInstruction = null;
+  p.proposalSentAt = null;
+  entries(p).forEach((mc) => { mc.s = "Sent"; });
+  syncFlat(p);
+  file(p, { name: `Renewal slip v${p.slipVersion} — drafted.pdf`, type: "Slip", version: p.slipVersion, recipient: "Internal", from: "Broker" });
+  record(p, "Renewal started", "New slip drafted from expiring terms");
   emit(TOPICS.PROGRAMS, { id, action: "renewal-started" });
   return p;
 }
 
 /**
- * Adjust a market's signed line while the slip is still a draft.
- *
- * Only in draft: once a slip is with the market, its lines are what the
- * reinsurers were asked to sign, and editing them behind their back would make
- * every confirmation meaningless.
+ * Adjust a market's signed line while the slip is still a draft. Only in
+ * draft: once a slip is with the market, its lines are what the reinsurers
+ * were asked to sign.
  */
-export function setSignedLine(id, marketName, line) {
+export function setSignedLine(id, marketName, line, layer) {
   const p = programById(id);
-  if (!p || p.status !== "Draft") return null;
-  const mc = p.marketConfirmations.find((x) => x.m === marketName);
+  if (!p || normaliseStatus(p.status) !== STATUS.DRAFT) return null;
+  const mc = allocation(p, marketName, layer);
   if (!mc) return null;
   mc.line = Math.max(0, Math.min(100, Number(line) || 0));
+  syncFlat(p);
   emit(TOPICS.PROGRAMS, { id, action: "line-changed" });
   return p;
 }
 
 /** Take a market off a draft slip. */
-export function removeMarketFromDraft(id, marketName) {
+export function removeMarketFromDraft(id, marketName, layer) {
   const p = programById(id);
-  if (!p || p.status !== "Draft") return null;
-  p.marketConfirmations = p.marketConfirmations.filter((x) => x.m !== marketName);
+  if (!p || normaliseStatus(p.status) !== STATUS.DRAFT) return null;
+  if (isLayered(p)) {
+    const l = p.layers[Number(layer) || 0];
+    if (l) l.markets = (l.markets || []).filter((x) => x.m !== marketName);
+    syncFlat(p);
+  } else {
+    p.marketConfirmations = p.marketConfirmations.filter((x) => x.m !== marketName);
+  }
   emit(TOPICS.PROGRAMS, { id, action: "market-removed" });
   return p;
 }
 
 /**
- * Preparer hands the draft to an authorised signatory.
- * Refuses an incomplete slip — the checker should not be the one to notice a
- * panel that does not add up.
+ * Preparer hands the draft to an authorised signatory. Refuses an incomplete
+ * slip — the checker should not be the one to notice a panel that does not
+ * add up.
  */
 export function submitForApproval(id) {
   const p = programById(id);
-  if (!p || p.status !== "Draft") return null;
+  if (!p || normaliseStatus(p.status) !== STATUS.DRAFT) return null;
   if (!readyToSubmit(p).ready) return null;
-
-  p.status = "Pending Approval";
+  p.status = STATUS.PENDING_APPROVAL;
   p.submittedAt = todayISO();
   if (!p.preparedBy) p.preparedBy = stamp(currentUser());
+  record(p, "Submitted for internal approval");
   emit(TOPICS.PROGRAMS, { id, action: "submitted-for-approval" });
   return p;
 }
 
 /**
- * The release gate. An authorised signatory who did not prepare the submission
- * puts the slip in front of the market — this is the moment the placement
- * becomes visible outside the firm, so every condition is re-checked here
- * rather than trusted from the submit step.
+ * The release gate — "Place to market". An authorised signatory who did not
+ * prepare the submission puts the slip in front of the market. Every
+ * condition is re-checked here rather than trusted from the submit step.
+ *
+ * Placing sends the slip; it does not answer it. Every line is Sent until a
+ * broker records what the market actually said.
  */
 export function releaseSlip(id) {
   const p = programById(id);
-  if (!p || p.status !== "Pending Approval") return null;
-
+  if (!p || normaliseStatus(p.status) !== STATUS.PENDING_APPROVAL) return null;
   const user = currentUser();
   if (!canReleaseSlip(p, cedantNamed(p.cedant), user)) return null;
 
   const override = usedOverride(p, user);
-
-  p.status = "Slip Issued";
+  p.status = STATUS.PLACED;
   p.approvedBy = stamp(user);
   p.releasedAt = todayISO();
   // A self-approval must not look the same as a witnessed one on the record.
   p.releasedUnderOverride = override;
-  p.documents.unshift({
-    name: override
-      ? `Slip — released under administrator override.pdf`
-      : `Slip — released to market.pdf`,
-    from: user.name, date: todayISO(), type: "Slip",
+  entries(p).forEach((mc) => { if (!mc.s) mc.s = "Sent"; });
+  syncFlat(p);
+  file(p, {
+    name: override ? `Slip v${p.slipVersion || 1} — placed under administrator override.pdf` : `Slip v${p.slipVersion || 1} — placed to market.pdf`,
+    type: "Slip", version: p.slipVersion || 1, recipient: panelMarkets(p).join(", ") || "Market", from: user.name, delivery: "Sent",
   });
+  record(p, "Placed to market", override ? "Released under administrator override" : "", { approvedBy: user.name });
   emit(TOPICS.PROGRAMS, { id, action: "slip-released" });
-
-  // Issuing a slip is sending it, so the panel responds in the same act.
-  return sendSlipToMarkets(id);
+  return p;
 }
 
 /** Checker sends it back for rework, with the reason on the record. */
 export function returnToDraft(id, reason) {
   const p = programById(id);
-  if (!p || p.status !== "Pending Approval") return null;
-
-  p.status = "Draft";
-  p.documents.unshift({
-    name: `Returned to preparer — ${reason || "see notes"}.txt`,
-    from: currentUser().name, date: todayISO(), type: "Review",
-  });
+  if (!p || normaliseStatus(p.status) !== STATUS.PENDING_APPROVAL) return null;
+  p.status = STATUS.DRAFT;
+  file(p, { name: `Returned to preparer — ${reason || "see notes"}.txt`, type: "Review", recipient: "Internal" });
+  record(p, "Returned to preparer", reason);
   emit(TOPICS.PROGRAMS, { id, action: "returned-to-draft" });
   return p;
 }
 
 /**
- * Send or resend the slip to the named market panel and record the round.
- * Markets respond; the resulting mix of confirmations and queries decides
- * whether the placement advances or drops back into negotiation.
+ * Revise a slip that is already in market: back to Draft as a new slip
+ * version. Whatever the markets confirmed was confirmed against the old
+ * version, so every response resets to Sent and the slip goes back through
+ * approval. Any cedant approval or bind instruction is invalidated with it.
+ */
+export function reviseSlip(id, reason) {
+  const p = programById(id);
+  if (!p) return null;
+  const s = normaliseStatus(p.status);
+  if (isPreMarket(p) || s === STATUS.BOUND || s === STATUS.RENEWAL_DUE) return null;
+  invalidateCedantDecisions(p, "Slip revised");
+  if (p.proposalVersion) {
+    record(p, `Proposal v${p.proposalVersion} superseded`, "Slip revised — a new proposal is required after re-placement");
+  }
+  p.proposalStale = false;
+  p.revisionRequired = false;
+  p.status = STATUS.DRAFT;
+  p.slipVersion = (p.slipVersion || 1) + 1;
+  p.approvedBy = null;
+  p.preparedBy = stamp(currentUser());
+  entries(p).forEach((mc) => { mc.s = "Sent"; });
+  syncFlat(p);
+  file(p, { name: `Slip v${p.slipVersion} — revision drafted.pdf`, type: "Slip", version: p.slipVersion, recipient: "Internal" });
+  record(p, "Slip revised", reason);
+  emit(TOPICS.PROGRAMS, { id, action: "slip-revised" });
+  return p;
+}
+
+/* ---- market negotiation ------------------------------------------------ */
+
+/**
+ * Chase the panel: resend the current slip version without touching any
+ * response already recorded.
  */
 export function sendSlipToMarkets(id) {
   const p = programById(id);
-  if (!p) return null;
-  // Reaching here from anything but an issued slip means this is a chase.
-  if (p.status !== "Slip Issued") p.status = "Slip Issued";
-  // Simulated panel response: every third market comes back with a query.
-  p.marketConfirmations.forEach((mc, i) => {
-    if (mc.s === "Sent" || !mc.s) mc.s = (i % 3 === 2) ? "Queried" : "Confirmed";
-  });
-  p.status = statusAfterConfirmationRound(p);
-  p.documents.push({
-    name: `Confirmation round — ${todayISO()}.pdf`,
-    from: "Panel", date: todayISO(), type: "Confirmation",
-  });
+  if (!p || ![STATUS.PLACED, STATUS.NEGOTIATING].includes(normaliseStatus(p.status))) return null;
+  file(p, { name: `Slip v${p.slipVersion || 1} — chaser ${todayISO()}.pdf`, type: "Correspondence", version: p.slipVersion || 1, recipient: panelMarkets(p).join(", "), delivery: "Sent" });
+  record(p, "Slip re-sent to panel");
   emit(TOPICS.PROGRAMS, { id, action: "slip-sent" });
   return p;
 }
 
 /**
- * Add a negotiation document. Filing a note against a queried placement
- * resolves the oldest open query — the paper trail is what moves the deal.
+ * Record what a market said. Manual, one line at a time — the response is the
+ * broker's evidence of a conversation, never an assumption. While the
+ * placement is in the market stage its status follows the panel: Backup
+ * Secured when every unit is confirmed at 100%, Market Negotiation otherwise.
+ * Once a proposal is with the cedant a market change is recorded and flagged,
+ * but does not silently move the placement.
  */
-export function addDocument(id) {
+export function recordMarketResponse(id, marketName, response, { layer, notes, line } = {}) {
   const p = programById(id);
   if (!p) return null;
-  p.documents.push({
-    name: `Negotiation note ${p.documents.length + 1}.pdf`,
-    from: "Broker", date: todayISO(), type: "Negotiation",
-  });
-  if (p.status === "Negotiating") {
-    const queried = p.marketConfirmations.find((mc) => mc.s === "Queried");
-    if (queried) queried.s = "Confirmed";
-    p.status = statusAfterConfirmationRound(p);
+  const s = normaliseStatus(p.status);
+  if (isPreMarket(p) || s === STATUS.BOUND || s === STATUS.RENEWAL_DUE) return null;
+  const mc = allocation(p, marketName, layer);
+  if (!mc || !canRecordResponse(mc.s, response)) return null;
+
+  mc.s = response;
+  if (line != null && line !== "") mc.line = Math.max(0, Math.min(100, Number(line) || 0));
+  syncFlat(p);
+  const layerNote = isLayered(p) ? ` (layer ${(Number(layer) || 0) + 1})` : "";
+  record(p, `Market response: ${marketName}${layerNote} — ${response}`, notes);
+  if (response === "Quoted" || response === "Queried" || response === "Declined") {
+    file(p, { name: `${marketName} — ${response.toLowerCase()}${layerNote}.pdf`, type: "Market response", from: marketName, recipient: "Broker", delivery: "Received" });
   }
+  const before = p.status;
+  if (isWithCedant(p)) {
+    // The cedant saw a proposal describing a panel that has now changed. That
+    // proposal is stale, whatever it was: approval and instruction are void,
+    // and the placement drops back to the market stage the panel supports.
+    // Recovering the capacity later does not revive the old decisions — a new
+    // proposal version and a new approval are required.
+    record(p, `Proposal v${p.proposalVersion || 1} marked stale`, `Panel changed after proposal: ${marketName}${layerNote} → ${response}`);
+    invalidateCedantDecisions(p, "Panel changed after proposal");
+    p.proposalStale = true;
+    p.status = statusAfterPanelChangeWithCedant(p);
+  } else {
+    p.status = statusAfterMarketResponse(p);
+  }
+  if (p.status !== before) record(p, `Status → ${p.status}`, "Derived from market responses");
+  emit(TOPICS.PROGRAMS, { id, action: "market-response" });
+  return p;
+}
+
+/**
+ * Set the agreed payment warranty on a draft. Only while it is a draft — once
+ * a slip is issued the period is part of what the market signed. Never
+ * defaults: an unsupported value is refused rather than rounded.
+ */
+export function setPaymentWarranty(id, days) {
+  const p = programById(id);
+  if (!p || normaliseStatus(p.status) !== STATUS.DRAFT) return null;
+  if (!isValidPaymentWarranty(days)) return null;
+  p.terms = { ...(p.terms || {}), paymentWarrantyDays: Number(days) };
+  record(p, "Payment warranty set", `${Number(days)} days`);
+  emit(TOPICS.PROGRAMS, { id, action: "warranty-set" });
+  return p;
+}
+
+/** Add a negotiation or correspondence document. Filing never moves a status. */
+export function addDocument(id, { name, type = "Negotiation", recipient = "Internal", from } = {}) {
+  const p = programById(id);
+  if (!p) return null;
+  file(p, { name: name || `Negotiation note ${(p.documents?.length || 0) + 1}.pdf`, type, recipient, from: from || actorName() });
+  record(p, "Document filed", name || type);
   emit(TOPICS.PROGRAMS, { id, action: "document-added" });
   return p;
 }
 
-/**
- * Bind the placement once the cedant approves. Binding captures the binding
- * instructions, opens the premium as unpaid, and raises the market invoice.
- */
-export function approveAndBind(id, bindingInstructions) {
+/** Move a document's delivery status along: Issued → Sent → Delivered → Acknowledged. */
+export const DELIVERY_STATUSES = ["Filed", "Issued", "Sent", "Delivered", "Acknowledged"];
+export function setDocumentDelivery(id, docIndex, delivery) {
   const p = programById(id);
-  if (!p || !canBind(p)) return null;
-  if (bindingInstructions != null) p.bindingInstructions = bindingInstructions;
-  p.status = "Bound";
-  p.premiumPaid = false;
-  raiseInvoice({
-    program: p.id,
-    counterparty: p.marketConfirmations.map((mc) => mc.m).join(", "),
-    amount: Math.round(p.premium * cessionRate(p.type)),
-    ccy: p.ccy,
-    coBroker: p.coBroker,
-  });
-  emit(TOPICS.PROGRAMS, { id, action: "bound" });
+  const doc = p?.documents?.[docIndex];
+  if (!doc || !DELIVERY_STATUSES.includes(delivery)) return null;
+  doc.delivery = delivery;
+  record(p, `Document ${delivery.toLowerCase()}`, doc.name);
+  emit(TOPICS.PROGRAMS, { id, action: "document-delivery" });
+  return p;
+}
+
+/* ---- cedant workflow --------------------------------------------------- */
+
+/** A revision after approval voids the approval and any instruction to bind. */
+function invalidateCedantDecisions(p, why) {
+  if (p.cedantApproval) {
+    record(p, "Cedant approval invalidated", `${why} — approval of proposal v${p.cedantApproval.proposalVersion} no longer stands`);
+    p.cedantApproval = null;
+  }
+  if (p.bindInstruction) {
+    record(p, "Instruction to bind invalidated", `${why} — instruction ${p.bindInstruction.reference || ""} no longer stands`.trim());
+    p.bindInstruction = null;
+  }
+}
+
+/** The broker sends the proposal (terms plus confirmed panel) to the cedant. */
+export function recordProposalSent(id, notes) {
+  const p = programById(id);
+  if (!p || !canSendProposal(p)) return null;
+  p.proposalVersion = (p.proposalVersion || 0) + 1;
+  p.proposalSentAt = todayISO();
+  p.proposalSlipVersion = p.slipVersion || 1;
+  p.proposalStale = false;
+  p.status = STATUS.PROPOSAL_SENT;
+  file(p, { name: `Proposal v${p.proposalVersion} — ${p.cedant}.pdf`, type: "Proposal", version: p.proposalVersion, recipient: p.cedant, delivery: "Sent" });
+  record(p, `Proposal v${p.proposalVersion} sent to cedant`, notes);
+  emit(TOPICS.PROGRAMS, { id, action: "proposal-sent" });
+  return p;
+}
+
+/** The cedant asked for changes. Anything they had approved is void. */
+export function recordCedantRevision(id, notes) {
+  const p = programById(id);
+  if (!p || !canRecordCedantRevision(p)) return null;
+  invalidateCedantDecisions(p, "Cedant requested revision");
+  p.status = STATUS.CEDANT_NEGOTIATION;
+  // The same terms may not go back as a "revised" proposal; the slip must change.
+  p.revisionRequired = true;
+  p.proposalStale = true;
+  p.cedantRevisionNotes = notes || "";
+  record(p, "Cedant requested revision", notes);
+  emit(TOPICS.PROGRAMS, { id, action: "cedant-revision" });
   return p;
 }
 
 /**
- * Save a new submission as a draft.
- *
- * Nothing leaves the firm here: the record exists, the panel is named with its
- * signed lines, and the slip waits for an authorised signatory to release it.
+ * The cedant approved the proposal. This is approval of terms only; the
+ * placement now waits for an explicit instruction to bind.
  */
-export function saveDraft({ cedant, cls, type, structure, markets, premium, terms }) {
-  const id = nextProgramId();
-  const confirmations = Object.entries(markets || {})
-    .filter(([, line]) => line > 0)
-    .map(([m, line]) => ({ m, s: "Sent", line }));
+export function recordCedantApproval(id, notes) {
+  const p = programById(id);
+  if (!p || !canRecordCedantDecision(p)) return null;
+  p.cedantApproval = { at: todayISO(), by: actorName(), notes: notes || "", proposalVersion: p.proposalVersion || 1 };
+  p.status = STATUS.CEDANT_APPROVED;
+  record(p, `Cedant approved proposal v${p.cedantApproval.proposalVersion}`, notes);
+  emit(TOPICS.PROGRAMS, { id, action: "cedant-approved" });
+  return p;
+}
 
-  state.programs.unshift({
-    id,
-    cedant, cls, type, structure,
-    // Priced from the terms entered in the wizard. A submission that cannot
-    // price itself carries nothing rather than an invented figure.
-    premium: Math.round(premium) || 0,
-    terms: terms || {},
-    ccy: "USD",
-    status: "Draft",
+/** The cedant's instruction to bind — an explicit, referenced act. */
+export function recordBindInstruction(id, { reference, notes } = {}) {
+  const p = programById(id);
+  if (!p || !canRecordBindInstruction(p)) return null;
+  p.bindInstruction = { at: todayISO(), by: actorName(), reference: reference || "", notes: notes || "", proposalVersion: p.proposalVersion || 1 };
+  p.status = STATUS.BIND_INSTRUCTED;
+  file(p, { name: `Instruction to bind${reference ? ` — ${reference}` : ""}.pdf`, type: "Instruction", from: p.cedant, recipient: "Broker", delivery: "Received" });
+  record(p, "Instruction to bind received", [reference, notes].filter(Boolean).join(" · "));
+  emit(TOPICS.PROGRAMS, { id, action: "bind-instructed" });
+  return p;
+}
+
+/* ---- binding ----------------------------------------------------------- */
+
+/**
+ * Execute the binding on the cedant's instruction. Binding freezes the agreed
+ * terms, issues the RI slip to the cedant and a binding slip to each reinsurer,
+ * opens the premium as unpaid and raises the market invoice. Anything that
+ * changes after this is an amendment or endorsement, never an edit.
+ */
+export function executeBinding(id, bindingInstructions) {
+  const p = programById(id);
+  if (!p || !canBind(p)) return null;
+  if (bindingInstructions != null) p.bindingInstructions = bindingInstructions;
+
+  const markets = panelMarkets(p);
+  p.boundTerms = {
+    frozenAt: todayISO(), by: actorName(),
+    slipVersion: p.slipVersion || 1, proposalVersion: p.proposalVersion || 1,
+    type: p.type, structure: p.structure, premium: p.premium, ccy: p.ccy,
+    terms: JSON.parse(JSON.stringify(p.terms || {})),
+    layers: p.layers ? JSON.parse(JSON.stringify(p.layers)) : null,
+    panel: entries(p).map((mc) => ({ ...mc })),
+    bindingInstructions: p.bindingInstructions || "",
+  };
+  p.status = STATUS.BOUND;
+  p.boundAt = todayISO();
+  p.boundBy = stamp(currentUser());
+  p.premiumPaid = false;
+
+  // Reinsurers first so the cedant's RI slip sits on top of the dropbox.
+  markets.slice().reverse().forEach((m) => file(p, {
+    name: `Binding slip — ${m}.pdf`, type: "Binding Slip", version: p.slipVersion || 1, recipient: m, delivery: "Issued",
+  }));
+  file(p, { name: `RI slip — ${p.cedant}.pdf`, type: "RI Slip", version: p.slipVersion || 1, recipient: p.cedant, delivery: "Issued" });
+
+  raiseInvoice({
+    program: p.id,
+    counterparty: markets.join(", "),
+    amount: Math.round(p.premium * cessionRate(p.type)),
+    ccy: p.ccy,
+    coBroker: p.coBroker,
+  });
+  record(p, "Bound and issued", `Terms frozen at slip v${p.slipVersion || 1}, proposal v${p.proposalVersion || 1}. RI slip and ${markets.length} binding slip(s) issued.`);
+  emit(TOPICS.PROGRAMS, { id, action: "bound" });
+  return p;
+}
+
+/** Kept for callers of the previous name. */
+export const approveAndBind = executeBinding;
+
+/* ---- creating and editing drafts -------------------------------------- */
+
+/** Build a fresh program record. Nothing leaves the firm here. */
+function newProgram({ id: existingId, cedant, cls, type, ccy, terms, layers, markets, structure, premium, intakeRef }) {
+  const id = existingId || nextProgramId();
+  const layered = type === "Excess of Loss" && Array.isArray(layers) && layers.length;
+  const confirmations = layered
+    ? layers.flatMap((l, i) => (l.markets || []).map((mc) => ({ ...mc, layer: i })))
+    : (markets || []).map((mc) => ({ m: mc.m, s: "Sent", offered: mc.offered ?? null, line: Number(mc.line) || 0 }));
+  const program = {
+    id, cedant, cls, type,
+    structure: structure || structureLine(type, terms, layers),
+    premium: Math.round(premium ?? estimatedGrossPremium(type, terms)) || 0,
+    terms: { ...(terms || {}), paymentWarrantyDays: isValidPaymentWarranty(terms?.paymentWarrantyDays) ? Number(terms.paymentWarrantyDays) : null },
+    ccy: ccy || "USD",
+    status: STATUS.DRAFT,
     expiry: "2027-06-01",
-    loss: 0,
-    earned: 0,
-    premiumPaid: false,
-    coBroker: null,
+    loss: 0, earned: 0, premiumPaid: false, coBroker: null,
     bindingInstructions: "",
     preparedBy: stamp(currentUser()),
     approvedBy: null,
+    slipVersion: 1, proposalVersion: 0, proposalSlipVersion: null, proposalStale: false, revisionRequired: false,
+    cedantApproval: null, bindInstruction: null, boundTerms: null,
+    intakeRef: intakeRef || null,
+    layers: layered ? layers.map((l) => ({ limit: Number(l.limit) || 0, attachment: Number(l.attachment) || 0, markets: (l.markets || []).map((mc) => ({ m: mc.m, s: "Sent", offered: mc.offered ?? null, line: Number(mc.line) || 0 })) })) : null,
     marketConfirmations: confirmations,
-    documents: [{ name: "Slip v1 — draft.pdf", from: "Broker", date: todayISO(), type: "Slip" }],
-  });
-
-  emit(TOPICS.PROGRAMS, { id, action: "draft-saved" });
-  return id;
+    documents: [{ name: "Slip v1 — draft.pdf", from: "Broker", date: todayISO(), type: "Slip", version: 1, recipient: "Internal", delivery: "Filed" }],
+    history: [],
+  };
+  if (program.layers) syncFlat(program);
+  return program;
 }
 
-export { TODAY };
+/**
+ * Save a new placement as a Draft Slip.
+ *
+ * @param {object} draft
+ * @param {string} draft.cedant  registry cedant name
+ * @param {string} draft.type    "Quota Share" | "Excess of Loss"
+ * @param {object} draft.terms   { insured, sumInsured, rate, paymentWarrantyDays, ... }
+ * @param {{m, offered, line}[]} [draft.markets]   quota share panel
+ * @param {{limit, attachment, markets}[]} [draft.layers]  XoL tower
+ */
+export function saveDraft(draft) {
+  const p = newProgram(draft);
+  state.programs.unshift(p);
+  record(p, "Draft slip saved", draft.intakeRef ? `From intake ${draft.intakeRef}` : "");
+  emit(TOPICS.PROGRAMS, { id: p.id, action: "draft-saved" });
+  return p.id;
+}
+
+/** Called by the intake service when an intake is accepted. */
+export function createDraftFromIntake(draft) {
+  return saveDraft({ ...draft, markets: [], layers: null });
+}
+
+/**
+ * Replace a draft's terms and panel with what the wizard captured. Only while
+ * it is a Draft — after that the slip is a versioned document.
+ */
+export function updateDraft(id, draft) {
+  const p = programById(id);
+  if (!p || normaliseStatus(p.status) !== STATUS.DRAFT) return null;
+  const fresh = newProgram({ ...draft, id: p.id, intakeRef: p.intakeRef });
+  Object.assign(p, {
+    cedant: fresh.cedant, cls: fresh.cls, type: fresh.type, ccy: fresh.ccy,
+    terms: fresh.terms, structure: fresh.structure, premium: fresh.premium,
+    layers: fresh.layers, marketConfirmations: fresh.marketConfirmations,
+  });
+  record(p, "Draft slip updated");
+  emit(TOPICS.PROGRAMS, { id, action: "draft-updated" });
+  return p;
+}
+
+export { TODAY, backupSecured };

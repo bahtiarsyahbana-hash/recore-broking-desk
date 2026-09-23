@@ -16,6 +16,18 @@ const TONE = {
   "Draft": "neutral", "Pending Approval": "warn",
   "Queried": "warn", "Negotiating": "warn", "Cedant Approval": "warn",
   "Renewal Due": "warn", "Under Review": "warn", "Review due": "warn",
+  // Placement lifecycle: market-facing stages read as information, cedant-
+  // facing stages as an action owed, capacity secured and bind instructed as good.
+  "Placed to Market": "info", "Market Negotiation": "warn", "Backup Secured": "good",
+  "Proposal Sent": "info", "Cedant Negotiation": "warn", "Cedant Approved": "good",
+  "Bind Instructed": "good",
+  // Market responses.
+  "Reviewing": "info", "Quoted": "info", "Declined": "bad",
+  // Intake queue.
+  "Received": "info", "Accepted": "good", "Revision Requested": "warn",
+  "Converted to Placement": "good",
+  // Document delivery.
+  "Issued": "info", "Delivered": "good", "Acknowledged": "good", "Filed": "neutral",
   // A counterparty nobody has onboarded is neither fine nor failing.
   "Not assessed": "neutral",
   "Exception": "bad", "Notified": "bad", "Pending Credit Control": "bad", "Overdue": "bad",
@@ -80,6 +92,11 @@ export function codeBadge(entry) {
              : entry.lei ? `LEI/${entry.lei}`
              : null;
   return code ? `<span class="reg-code mono" title="Counterparty code used on regulatory returns">${code}</span>` : "";
+}
+
+/** Small substatus tag, used on Kanban cards and list rows. */
+export function subBadge(label, tone = "neutral") {
+  return `<span class="sub-badge ${tone}">${label}</span>`;
 }
 
 /** Standard empty state. */

@@ -1,17 +1,22 @@
 /**
- * Submission service — risks and renewals the cedant portal sends into the
- * desk's placement queue. They sit as pending until a broker works them up
- * into a slip through the submission wizard.
+ * Submission service — the cedant portal's way into the broker intake queue.
+ *
+ * A portal submission is an intake with `source: "portal"`; it sits in the
+ * same queue as a manually recorded one and is worked up the same way. This
+ * module is kept so existing callers keep their names.
  */
-import { state } from "../core/store.js";
-import { emit, TOPICS } from "../core/events.js";
+import { state, currentCedant } from "../core/store.js";
+import { createPortalIntake, intakesForCedant } from "./intake.service.js";
 
 /** Queue a risk or renewal request from the cedant portal. */
-export function submitRisk({ cls, type, amount, notes }) {
-  const submission = { cls, type, amount, notes, received: new Date() };
-  state.pendingSubmissions.unshift(submission);
-  emit(TOPICS.SUBMISSIONS, submission);
-  return submission;
+export function submitRisk({ cls, type, amount, notes, insuredName, ccy, paymentWarrantyDays, rate }) {
+  const intake = createPortalIntake({
+    cls, requestedType: type, sumInsured: amount, notes, insuredName, ccy, paymentWarrantyDays, rate,
+  });
+  // Mirror onto the legacy list so anything still reading it sees the request.
+  state.pendingSubmissions.unshift({ cls, type, amount, notes, received: new Date(), intakeId: intake.id });
+  return intake;
 }
 
-export const pendingSubmissions = () => state.pendingSubmissions;
+/** What the signed-in cedant has with the desk, newest first. */
+export const pendingSubmissions = () => intakesForCedant(currentCedant());

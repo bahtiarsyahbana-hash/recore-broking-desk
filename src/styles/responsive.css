@@ -11,4 +11,10 @@
   .cols-2{ grid-template-columns:1fr; }
   .field-row,.field-row3{ grid-template-columns:1fr; }
   .view{ padding:16px 16px 50px; }
+  /* The board becomes a horizontal strip of columns; the list stacks. */
+  .kanban{ grid-template-columns:repeat(6, 230px); }
+  .lrow{ flex-direction:column; align-items:stretch; }
+  .lrow-side{ align-items:flex-start; text-align:left; }
+  .hist-row{ grid-template-columns:1fr; gap:2px; }
+  .market-row.alloc-row, .alloc-head{ grid-template-columns:1fr 64px 64px 30px; gap:6px; }
 }

@@ -87,9 +87,24 @@ Recordes-Broking-Desk.html  the original single-file prototype, kept for referen
 
 ## What the desk does
 
-**Broker desk** — the full workspace. The placement lifecycle runs Draft →
-Pending Approval → Slip Issued → Negotiating → Cedant Approval → Bound, and
-loops back through the 60-day renewal list.
+**Broker desk** — the full workspace. A request for cover starts in the
+**Intake** queue (recorded by the desk from email, phone, WhatsApp or a
+meeting, or sent from the cedant portal) and, once accepted, becomes a
+placement. The placement lifecycle runs Draft Slip → internal approval →
+Placed to Market → Market Negotiation → Backup Secured → Proposal Sent →
+Cedant Negotiation → Cedant Approved (awaiting instruction to bind) → Bind
+Instructed → Bound Issued, and loops back through the 60-day renewal list.
+Market backup is not cedant approval, cedant approval is not an instruction to
+bind, and binding is its own recorded act.
+
+The Placements page shows the same book as a **Kanban** board (one column per
+stage, substatus on each card, counts per column, no drag-and-drop — a status
+changes only through a recorded action), a **Table** or a compact **List**; the
+choice is remembered for the browser session. Open intakes appear in the
+board's Intake column and open the intake drawer. New placements are Quota Share
+(one horizontal panel) or Excess of Loss (a layered tower, each layer with its
+own panel that must sign to exactly 100%); historical Facultative and Surplus
+records remain visible.
 
 The wizard's final step is a **full summary of the placement** — the risk, the
 terms as entered with the gross and ceded premium they price to, and the market
@@ -111,8 +126,17 @@ The lifecycle drawer walks an operator through that journey rather than leaving
 them to infer it: a numbered rail shows where the placement is, a **next-action
 card** names the one thing to do now and why — "Resolve 1 open query · Andean
 Capacity Re has queried the terms" — with its button attached, and a checklist
-states what is still holding the bind. The only hard gate is that **every named
-market must be Confirmed**; binding instructions are optional.
+states what is still holding the bind. The hard gates are that **confirmed
+signed lines total exactly 100%** on every layer, that the cedant's approval
+and then their **instruction to bind** have been recorded, and that any cedant
+revision after approval has invalidated both. The separate free-text **binding
+notes** (payment terms, subjectivities and special conditions) are optional;
+the cedant's instruction to bind is not.
+Binding freezes the terms and issues the RI slip and binding slips, each with a
+delivery status.
+
+Tests: `npm test` runs the domain rules (lifecycle, panel capacity, intake)
+with Node's built-in test runner; there are no dependencies.
 
 The dashboard shows **concentration** alongside the totals: premium by cedant
 and exposure by reinsurer, each ranked with a flag when a single counterparty

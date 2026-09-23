@@ -19,6 +19,11 @@ import { fmt } from "../core/format.js";
  */
 export function estimatedGrossPremium(type, terms = {}) {
   const n = (v) => Number(v) || 0;
+  // A facultative placement — whichever form it is ceded on — is priced off the
+  // insured's sum insured and the agreed rate. That is the new-placement path.
+  if (terms.sumInsured && terms.rate != null && terms.rate !== "") {
+    return n(terms.sumInsured) * n(terms.rate) / 100;
+  }
   switch (type) {
     // Rate on the sum insured.
     case "Facultative":
@@ -37,6 +42,17 @@ export function estimatedGrossPremium(type, terms = {}) {
   }
 }
 
+/** "30 days" — payment warranty as it reads on a slip; structured days, never free text. */
+export function paymentWarrantyLine(days) {
+  const d = Number(days);
+  return d > 0 ? `${d} days` : "Not set";
+}
+
+/** "USD 10.00m xs USD 5.00m" per layer, joined for a structure line. */
+export function towerLine(layers = []) {
+  return layers.map((l) => `${fmt(Number(l.limit) || 0)} xs ${fmt(Number(l.attachment) || 0)}`).join(" · ");
+}
+
 /** The ceded share of that premium, where the form cedes a proportion. */
 export function estimatedCededPremium(type, terms = {}) {
   const gross = estimatedGrossPremium(type, terms);
@@ -45,8 +61,17 @@ export function estimatedCededPremium(type, terms = {}) {
 }
 
 /** One-line description of the structure, as it reads on a slip. */
-export function structureLine(type, terms = {}) {
+export function structureLine(type, terms = {}, layers = null) {
   const n = (v, fallback = 0) => Number(v) || fallback;
+  // New facultative placements describe the insured risk and, for XoL, the tower.
+  if (terms.insured && terms.sumInsured) {
+    const risk = `${terms.insured} · ${fmt(n(terms.sumInsured))} SI`;
+    if (type === "Excess of Loss" && Array.isArray(layers) && layers.length) {
+      return `${risk} · ${layers.length}-layer tower: ${towerLine(layers)}`;
+    }
+    if (type === "Quota Share") return `${risk} · quota share${terms.rate != null && terms.rate !== "" ? ` @ ${n(terms.rate)}%` : ""}`;
+    return `${risk}${terms.rate != null && terms.rate !== "" ? ` @ ${n(terms.rate)}%` : ""}`;
+  }
   switch (type) {
     case "Facultative":
       return `Single risk · ${fmt(n(terms.sumInsured))} SI @ ${n(terms.rate)}%`;

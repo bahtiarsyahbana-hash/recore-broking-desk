@@ -1,0 +1,86 @@
+/* Placements board — Kanban columns and cards, the compact list, and the
+   small badges and history rows shared with the lifecycle drawer. Cards are
+   read-only: a status changes through a recorded action, never a drag. */
+.kanban{
+  display:grid; grid-template-columns:repeat(6, minmax(190px, 1fr)); gap:12px;
+  overflow-x:auto; padding-bottom:6px; align-items:start;
+}
+.kcol{ background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); min-width:0; }
+.kcol-head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 12px; font-size:12px; font-weight:700; letter-spacing:.02em; color:var(--ink);
+  border-bottom:1px solid var(--line);
+}
+.kcol-count{
+  font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
+  background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:1px 8px; color:var(--ink-soft);
+}
+.kcol-body{ display:flex; flex-direction:column; gap:8px; padding:10px; min-height:80px; }
+.kcol-empty{ font-size:11.5px; color:var(--ink-soft); text-align:center; padding:18px 6px; }
+
+.kcard{
+  background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:10px 11px;
+  cursor:pointer; box-shadow:0 1px 2px rgba(0,18,51,.04); transition:border-color .15s, box-shadow .15s;
+}
+.kcard:hover, .kcard:focus-visible{ border-color:var(--marine); box-shadow:var(--shadow); outline:none; }
+/* An intake is not a placement: a dashed edge and neutral tag keep it distinct. */
+.kcard-intake{ border-style:dashed; background:var(--surface); }
+.kcard-top{ display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:12.5px; }
+.kcard-title{ font-weight:600; font-size:13px; margin-top:6px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; }
+.kcard-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+.kcard-meta.mono{ font-family:'IBM Plex Mono',monospace; font-size:11px; }
+.kcard-foot{ display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+
+/* Substatus tag — smaller and squarer than a status pill so the two read as
+   different levels of the same fact. */
+.sub-badge{
+  display:inline-block; padding:2px 7px; border-radius:5px; font-size:10.5px; font-weight:700;
+  letter-spacing:.02em; background:var(--surface-2); color:var(--ink-soft); white-space:nowrap;
+}
+.sub-badge.info{ background:var(--info-tint); color:var(--info); }
+.sub-badge.good{ background:var(--good-tint); color:var(--good); }
+.sub-badge.warn{ background:var(--warn-tint); color:var(--warn); }
+.sub-badge.bad{ background:var(--bad-tint); color:var(--bad); }
+
+/* Compact list. */
+.lrows{ display:flex; flex-direction:column; gap:6px; }
+.lrow{
+  display:flex; justify-content:space-between; gap:14px; align-items:center;
+  background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:10px 14px; cursor:pointer;
+}
+.lrow:hover, .lrow:focus-visible{ border-color:var(--marine); outline:none; }
+.lrow-main{ min-width:0; font-size:13px; }
+.lrow-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+.lrow-side{ text-align:right; display:flex; flex-direction:column; gap:5px; align-items:flex-end; font-size:12.5px; flex:none; }
+.lrow-side .mono{ font-family:'IBM Plex Mono',monospace; }
+
+/* Drawer additions: substatus line under the rail, layer headings, history. */
+.journey-sub{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:-8px 0 14px; }
+.layer-head{
+  font-size:11.5px; font-weight:700; color:var(--ink); margin-top:12px; padding:6px 0 2px;
+  border-top:1px dashed var(--line);
+}
+.hist-row{
+  display:grid; grid-template-columns:82px 1fr; gap:10px; padding:7px 0;
+  border-bottom:1px solid var(--line-soft); font-size:12px;
+}
+.hist-row:last-child{ border-bottom:none; }
+.hist-when{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
+.hist-what{ color:var(--ink); }
+.hist-who{ display:block; font-size:11px; color:var(--ink-soft); margin-top:1px; }
+.muted{ color:var(--ink-soft); }
+
+/* Wizard: layer tabs and the offered / signed allocation grid. */
+.layer-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+.layer-tab{
+  border:1px solid var(--line); background:var(--surface); border-radius:8px; padding:6px 10px;
+  display:flex; flex-direction:column; align-items:flex-start; gap:1px; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--ink);
+}
+.layer-tab.active{ border-color:var(--marine); background:var(--marine-tint); }
+.layer-tab-meta{ font-size:10.5px; font-weight:500; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; }
+.alloc-head{
+  display:grid; grid-template-columns:1fr 84px 84px 34px; gap:10px; padding:4px 6px;
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft);
+}
+.market-row.alloc-row{ display:grid; grid-template-columns:1fr 84px 84px 34px; }
+.market-row.alloc-row input[type=number]{ width:auto; }

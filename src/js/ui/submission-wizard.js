@@ -1,266 +1,268 @@
 /**
- * New submission wizard — four steps from risk basics to an issued slip.
+ * New placement wizard — four steps from risk basics to a saved Draft Slip.
  *
- * Step 2's fields are conditional on the treaty type chosen in step 1, which is
- * why each step is its own render function rather than one long form. Finishing
- * the wizard issues a slip; it never binds.
+ *   1. Risk basics       cedant, class, placement type (Quota Share | Excess of Loss)
+ *   2. Terms             insured, sum insured, currency, rate, payment warranty
+ *   3. Market panel      QS: one horizontal panel · XoL: a tower, one panel per layer
+ *   4. Review            full summary with capacity status, then Save / Submit / Place
+ *
+ * Finishing the wizard never sends anything to a market. "Place to market" is
+ * offered only to an authorised signatory who did not prepare the slip, and it
+ * runs the same four-eyes gate as the drawer. Historical Facultative and Surplus
+ * placements can be revised here without changing their form, but this wizard
+ * does not create new ones.
  */
-import { $, $$, row, mount } from "../core/dom.js";
-import { fmt } from "../core/format.js";
-import { state } from "../core/store.js";
+import { $, $$, mount } from "../core/dom.js";
+import { fmtFull, fmt } from "../core/format.js";
+import { state, programById, currentUser, cedantNamed } from "../core/store.js";
 import { openModal, updateModal, closeModal } from "./modal.js";
 import { icons } from "./icons.js";
 import { typeBadge } from "./badges.js";
-import { UNDERWRITING_YEAR } from "../core/config.js";
-import { saveDraft } from "../services/placement.service.js";
-import {
-  structureLine, estimatedGrossPremium, estimatedCededPremium,
-} from "../domain/placement-terms.js";
-import { fmtFull } from "../core/format.js";
+import { saveDraft, updateDraft, submitForApproval, releaseSlip } from "../services/placement.service.js";
+import { structureLine, estimatedGrossPremium, paymentWarrantyLine } from "../domain/placement-terms.js";
+import { PLACEMENT_TYPES, EDITABLE_PLACEMENT_TYPES, PAYMENT_WARRANTY_DAYS, isValidPaymentWarranty } from "../domain/intake.js";
+import { paymentWarrantyCheck } from "../domain/slip-approval.js";
+import { capacityUnits, layerLabel } from "../domain/panel.js";
+import { releaseAuthority } from "../domain/authority.js";
+import { canReleaseSlip } from "../domain/slip-approval.js";
+import { normaliseStatus, STATUS } from "../domain/lifecycle.js";
 
-const STEP_LABELS = ["Risk basics", "Structure & terms", "Market panel", "Review & save"];
+const STEP_LABELS = ["Risk basics", "Terms", "Market panel", "Review & save"];
 const CLASSES = ["Property", "Casualty", "Marine", "Motor"];
-const TYPES = ["Facultative", "Quota Share", "Surplus", "Excess of Loss"];
+const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "IDR"];
 
 /** Wizard-local state. Reset on every open. */
 let step = 0;
-let draft = { type: "Facultative", markets: {} };
+let draft = null;
 let marketQuery = "";
-let onIssued = null;
+let activeLayer = 0;
+let editingId = null;
+let onSaved = null;
+
+const blankDraft = () => ({
+  cedant: "", cls: "Property", type: "Quota Share", ccy: "USD",
+  terms: { insured: "", sumInsured: 0, rate: null, paymentWarrantyDays: null },
+  markets: [],                                 // QS: [{ m, offered, line }]
+  layers: [{ limit: 0, attachment: 0, markets: [] }], // XoL tower
+});
 
 const options = (list, selected) =>
-  list.map((v) => `<option${v === selected ? " selected" : ""}>${v}</option>`).join("");
+  list.map((v) => `<option value="${v}"${String(v) === String(selected) ? " selected" : ""}>${v}</option>`).join("");
 
-/* ---------- steps ---------- */
+const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+const isXol = () => draft.type === "Excess of Loss";
+const isHistoricalEdit = () => Boolean(editingId) && !PLACEMENT_TYPES.includes(draft.type);
+
+/** The program shape the domain rules read — used for live capacity checks. */
+const asProgram = () => ({
+  type: draft.type,
+  marketConfirmations: isXol() ? [] : draft.markets.map((mc) => ({ ...mc, s: "Sent" })),
+  layers: isXol() ? draft.layers.map((l) => ({ ...l, markets: l.markets.map((mc) => ({ ...mc, s: "Sent" })) })) : null,
+});
+
+/* ---------- step 1 ---------- */
 
 const stepRiskBasics = () => `
   <div class="field"><label>Cedant</label>
     <input type="text" id="w-cedant" list="w-cedant-options" autocomplete="off"
-      value="${draft.cedant || ""}" placeholder="Start typing a cedant's name">
-    <datalist id="w-cedant-options">${
-      state.cedants.map((c) => `<option value="${c.name.replace(/"/g, "&quot;")}">`).join("")
-    }</datalist>
+      value="${esc(draft.cedant)}" placeholder="Start typing a cedant's name">
+    <datalist id="w-cedant-options">${state.cedants.map((c) => `<option value="${esc(c.name)}">`).join("")}</datalist>
     <div class="hint" id="w-cedant-hint">${state.cedants.length} cedants on the registry. Must match one exactly.</div></div>
   <div class="field-row">
     <div class="field"><label>Class of business</label><select id="w-class">${options(CLASSES, draft.cls)}</select></div>
-    <div class="field"><label>Type</label><select id="w-type">${options(TYPES, draft.type)}</select></div>
-  </div>
-  <div class="field"><label>Underwriting year</label><input type="text" id="w-uwy" value="2026"></div>`;
-
-/**
- * Terms, by treaty form — each form asks only for what prices it.
- *
- * One schema drives three things: the step-2 form, what is captured into the
- * draft, and how the review step describes it. They used to be three separate
- * pieces of code, which is how every term typed here came to be discarded
- * before the slip was saved.
- */
-const TERMS_SCHEMA = {
-  "Facultative": [
-    { key: "insured", label: "Insured", type: "text", value: "Northline Terminals Ltd." },
-    { key: "sumInsured", label: "Sum insured", type: "money", value: 12000000, half: true },
-    { key: "rate", label: "Rate %", type: "number", step: 0.05, value: 0.85, half: true, suffix: "%" },
-  ],
-  "Quota Share": [
-    { key: "cession", label: "Cession %", type: "number", value: 30, half: true, suffix: "%" },
-    { key: "commission", label: "Commission %", type: "number", value: 27, half: true, suffix: "%" },
-    { key: "gnpi", label: "Estimated GNPI", type: "money", value: 9000000 },
-  ],
-  "Surplus": [
-    { key: "retention", label: "Retention", type: "money", value: 750000, half: true },
-    { key: "lines", label: "Lines", type: "number", value: 8, half: true },
-    // Without this the form cannot price itself, and the saved premium would
-    // have to be invented.
-    { key: "premium", label: "Estimated treaty premium", type: "money", value: 2400000 },
-  ],
-  "Excess of Loss": [
-    { key: "retention", label: "Retention", type: "money", value: 5000000, half: true },
-    { key: "limit", label: "Limit", type: "money", value: 15000000, half: true },
-    { key: "rol", label: "Rate on line %", type: "number", step: 0.1, value: 5.5, half: true, suffix: "%" },
-    { key: "reinstatements", label: "Reinstatements", type: "text", value: "2 @ 100% pro-rata", half: true },
-  ],
-};
-
-const termFields = () => TERMS_SCHEMA[draft.type] || [];
-
-/** Current value of a term: what was entered, else the schema default. */
-const termValue = (field) => draft.terms?.[field.key] ?? field.value;
-
-function termInput(field) {
-  const inputType = field.type === "text" ? "text" : "number";
-  const step = field.step ? ` step="${field.step}"` : "";
-  return `<div class="field"${field.half ? ' style="margin-bottom:0;"' : ""}>
-    <label for="w-${field.key}">${field.label}</label>
-    <input type="${inputType}" id="w-${field.key}" data-term="${field.key}" value="${termValue(field)}"${step}>
+    <div class="field"><label>Placement type</label><select id="w-type"${isHistoricalEdit() ? " disabled" : ""}>${options(isHistoricalEdit() ? [draft.type] : PLACEMENT_TYPES, draft.type)}</select>
+      <div class="hint">${isHistoricalEdit()
+        ? "Historical form retained for this revision. New placements are Quota Share or Excess of Loss."
+        : "Quota share places one horizontal panel; excess of loss builds a layered tower."}</div></div>
   </div>`;
-}
 
-/** Consecutive `half` fields pair into a row, as elsewhere in the app. */
-function stepTerms() {
-  const fields = termFields();
-  const out = [];
-  for (let i = 0; i < fields.length; i++) {
-    if (fields[i].half && fields[i + 1]?.half) {
-      out.push(`<div class="field-row">${termInput(fields[i])}${termInput(fields[i + 1])}</div>`);
-      i++;
-    } else {
-      out.push(termInput(fields[i]));
-    }
-  }
-  return out.join("") +
-    `<div class="hint">Fields shown are conditional on the type chosen in step 1.</div>`;
-}
+/* ---------- step 2 ---------- */
 
-/** Read step 2 back into the draft before the form is replaced. */
+const stepTerms = () => `
+  <div class="field"><label for="w-insured">Insured name</label>
+    <input type="text" id="w-insured" value="${esc(draft.terms.insured)}" placeholder="The original insured"></div>
+  <div class="field-row">
+    <div class="field"><label for="w-si">Sum insured</label><input type="number" id="w-si" min="0" step="1000" value="${draft.terms.sumInsured || ""}"></div>
+    <div class="field"><label for="w-ccy">Currency</label><select id="w-ccy">${options(CURRENCIES, draft.ccy)}</select></div>
+  </div>
+  <div class="field-row">
+    <div class="field"><label for="w-rate">Rate % <span class="optional-tag">when known</span></label>
+      <input type="number" id="w-rate" min="0" step="0.01" value="${draft.terms.rate ?? ""}" placeholder="e.g. 0.85">
+      <div class="hint">Leave blank if the market is to quote. Premium is sum insured × rate.</div></div>
+    <div class="field"><label for="w-warranty">Payment warranty <span class="req" aria-hidden="true">*</span></label>
+      <select id="w-warranty" required>
+        <option value=""${isValidPaymentWarranty(draft.terms.paymentWarrantyDays) ? "" : " selected"}>Select…</option>
+        ${PAYMENT_WARRANTY_DAYS.map((d) => `<option value="${d}"${Number(draft.terms.paymentWarrantyDays) === d ? " selected" : ""}>${d} days</option>`).join("")}
+      </select>
+      <div class="hint" id="w-warranty-hint">Select the agreed payment warranty period.</div></div>
+  </div>`;
+
 function captureTerms() {
-  draft.terms = draft.terms || {};
-  termFields().forEach((field) => {
-    const input = document.getElementById(`w-${field.key}`);
-    if (!input) return;
-    draft.terms[field.key] = field.type === "text" ? input.value : (Number(input.value) || 0);
-  });
+  draft.terms.insured = $("#w-insured")?.value.trim() ?? draft.terms.insured;
+  draft.terms.sumInsured = Number($("#w-si")?.value) || 0;
+  draft.ccy = $("#w-ccy")?.value || draft.ccy;
+  const rate = $("#w-rate")?.value;
+  draft.terms.rate = rate === "" || rate == null ? null : Number(rate);
+  const warranty = $("#w-warranty")?.value;
+  draft.terms.paymentWarrantyDays = isValidPaymentWarranty(warranty) ? Number(warranty) : null;
 }
 
-/** Format a term for the summary, per its declared type. */
-function formatTerm(field) {
-  const value = termValue(field);
-  if (field.type === "money") return fmtFull(Number(value) || 0);
-  if (field.suffix) return `${value}${field.suffix}`;
-  return String(value);
-}
+/* ---------- step 3: the panel ---------- */
 
-/** Signed lines across the panel. A slip must reach exactly 100%. */
-const signedTotal = () => Object.values(draft.markets).reduce((a, b) => a + b, 0);
-
-/**
- * Step 3 — the market panel.
- *
- * Search-and-add rather than a list of every market: the registry now holds
- * nearly two hundred carriers, and enumerating them all as number inputs made
- * the step unusable. A slip names a handful of reinsurers; this asks for those.
- */
 const MAX_RESULTS = 8;
+
+/** The allocation list the search adds to: the QS panel or the active layer. */
+const currentPanel = () => isXol() ? draft.layers[activeLayer].markets : draft.markets;
 
 function marketMatches(query) {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return [];
+  const taken = new Set(currentPanel().map((mc) => mc.m));
   return state.markets
-    .filter((m) => !(m.name in draft.markets))
-    .filter((m) => {
-      const hay = `${m.name} ${m.rating || ""} ${m.panel || ""} ${m.country || ""}`.toLowerCase();
-      return terms.every((t) => hay.includes(t));
-    })
+    .filter((m) => !taken.has(m.name))
+    .filter((m) => terms.every((t) => `${m.name} ${m.rating || ""} ${m.panel || ""} ${m.country || ""}`.toLowerCase().includes(t)))
     .slice(0, MAX_RESULTS);
 }
 
 function marketResults(query) {
   if (!query.trim()) return "";
   const matches = marketMatches(query);
-  if (!matches.length) return `<div class="market-results"><div class="market-none">No markets match "${query}".</div></div>`;
+  if (!matches.length) return `<div class="market-results"><div class="market-none">No markets match "${esc(query)}".</div></div>`;
   return `<div class="market-results">${matches.map((m) => `
-    <button type="button" class="market-result" data-add-market="${m.name}">
+    <button type="button" class="market-result" data-add-market="${esc(m.name)}">
       <span class="m-name">${m.name}</span>
       <span class="m-rating">${[m.panel, m.rating].filter(Boolean).join(" · ")}</span>
     </button>`).join("")}</div>`;
 }
 
-function selectedMarkets() {
-  const names = Object.keys(draft.markets);
-  if (!names.length) {
-    return `<div class="empty" style="padding:22px;">No markets on this slip yet. Search above to add one.</div>`;
-  }
-  return names.map((name) => `<div class="market-row">
-      <div><div class="m-name">${name}</div></div>
-      <input type="number" data-m="${name}" value="${draft.markets[name]}" min="0" max="100" aria-label="Signed line for ${name}">
-      <span style="width:14px;">%</span>
-      <button type="button" class="btn ghost" data-drop-market="${name}" title="Take ${name} off the slip" style="padding:6px 8px;">✕</button>
+function allocationRows(list) {
+  if (!list.length) return `<div class="empty" style="padding:18px;">No markets here yet. Search above to add one.</div>`;
+  return `<div class="alloc-head"><span>Market</span><span>Offered %</span><span>Signed %</span><span></span></div>` +
+    list.map((mc, i) => `<div class="market-row alloc-row">
+      <div class="m-name">${mc.m}<div class="m-rating">Response: Sent on placing</div></div>
+      <input type="number" data-alloc="offered" data-i="${i}" value="${mc.offered ?? ""}" min="0" max="100" placeholder="—" aria-label="Offered line for ${mc.m}">
+      <input type="number" data-alloc="line" data-i="${i}" value="${mc.line ?? 0}" min="0" max="100" aria-label="Signed line for ${mc.m}">
+      <button type="button" class="btn ghost" data-drop-market="${i}" title="Take ${mc.m} off" style="padding:6px 8px;">✕</button>
     </div>`).join("");
 }
 
+function capacityLine() {
+  const units = capacityUnits(asProgram(), fmt);
+  const u = isXol() ? units[activeLayer] : units[0];
+  const tone = u.signedComplete ? "good" : u.signed > 100 ? "bad" : "warn";
+  return `<div class="row"><span>${isXol() ? `Layer ${activeLayer + 1} signed` : "Total signed"}</span><span id="w-total" style="color:var(--${tone})">${u.signed}%</span></div>`;
+}
+
+function layerTabs() {
+  return `<div class="layer-tabs">
+    ${draft.layers.map((l, i) => {
+      const unit = capacityUnits(asProgram(), fmt)[i];
+      return `<button type="button" class="layer-tab${i === activeLayer ? " active" : ""}" data-layer="${i}">
+        <span>Layer ${i + 1}</span><span class="layer-tab-meta">${layerLabel(l, fmt)} · <span style="color:var(--${unit.signedComplete ? "good" : "warn"})">${unit.signed}%</span></span>
+      </button>`;
+    }).join("")}
+    <button type="button" class="btn ghost" data-add-layer style="padding:6px 10px;">+ Layer</button>
+  </div>`;
+}
+
+function layerTerms() {
+  const l = draft.layers[activeLayer];
+  return `<div class="field-row" style="margin-bottom:6px;">
+    <div class="field"><label for="w-limit">Limit</label><input type="number" id="w-limit" min="0" step="1000" value="${l.limit || ""}"></div>
+    <div class="field"><label for="w-att">Attachment</label><input type="number" id="w-att" min="0" step="1000" value="${l.attachment || ""}"></div>
+  </div>
+  <div class="hint" style="margin:-4px 0 10px;">Reads on the slip as <strong id="w-layer-label">${layerLabel(l, fmt)}</strong>.${draft.layers.length > 1 ? ` <button type="button" class="btn ghost" data-remove-layer="${activeLayer}" style="padding:2px 8px; font-size:11px;">Remove this layer</button>` : ""}</div>`;
+}
+
 function stepMarketPanel() {
-  const total = signedTotal();
-  const tone = total === 100 ? "good" : total > 100 ? "bad" : "warn";
-  return `<div class="panel-sub" style="margin-bottom:10px;">Add each reinsurer on the slip and enter its signed line — binding needs exactly 100%.</div>
+  return `<div class="panel-sub" style="margin-bottom:10px;">${isXol()
+      ? "Build the tower layer by layer. Each layer has its own panel and must be signed to exactly 100% on its own."
+      : "Add each reinsurer on the slip with the line offered and the line signed. Signed lines must total exactly 100%."}</div>
+    ${isXol() ? `<div id="w-layer-tabs">${layerTabs()}</div><div id="w-layer-terms">${layerTerms()}</div>` : ""}
     <div class="field">
-      <input type="search" id="w-market-search" autocomplete="off" value="${marketQuery}"
+      <input type="search" id="w-market-search" autocomplete="off" value="${esc(marketQuery)}"
         placeholder="Search ${state.markets.length} markets by name, panel or rating">
     </div>
     <div id="w-market-results">${marketResults(marketQuery)}</div>
-    <div id="w-market-selected">${selectedMarkets()}</div>
-    <div class="calc-out" style="margin-top:14px;">
-      <div class="row"><span>Total signed</span><span id="w-total" style="color:var(--${tone})">${total}%</span></div>
-    </div>`;
+    <div id="w-market-selected">${allocationRows(currentPanel())}</div>
+    <div class="calc-out" style="margin-top:14px;" id="w-capacity">${capacityLine()}</div>`;
 }
 
-/* ---------- step 4: the summary ---------- */
+/* ---------- step 4 ---------- */
 
-const summarySection = (heading, rows) => `<div class="summary-section">
-  <div class="summary-head">${heading}</div>
-  ${rows}
-</div>`;
+const section = (heading, rows) => `<div class="summary-section"><div class="summary-head">${heading}</div>${rows}</div>`;
+const srow = (label, value, cls = "") => `<div class="summary-row ${cls}"><span>${label}</span><span>${value}</span></div>`;
 
-const summaryRow = (label, value, cls = "") =>
-  `<div class="summary-row ${cls}"><span>${label}</span><span>${value}</span></div>`;
-
-/** Who the risk is for. */
-const riskSummary = () => summarySection("Risk", [
-  summaryRow("Cedant", draft.cedant || state.cedants[0].name),
-  summaryRow("Class of business", draft.cls || "Property"),
-  summaryRow("Type", typeBadge(draft.type)),
-  summaryRow("Underwriting year", draft.uwy || String(UNDERWRITING_YEAR)),
-].join(""));
-
-/**
- * The terms as entered, plus what they price to. Showing the derived premium
- * here is the point of the step: it is the first moment the numbers are
- * visible together, and it is the figure the placement will carry.
- */
-function termsSummary() {
-  const gross = estimatedGrossPremium(draft.type, draft.terms);
-  const ceded = estimatedCededPremium(draft.type, draft.terms);
-
-  const rows = termFields().map((f) => summaryRow(f.label, formatTerm(f))).join("")
-    + summaryRow("Structure", structureLine(draft.type, draft.terms))
-    + summaryRow("Gross premium", gross ? fmtFull(gross) : "—", "emphasis")
-    + (ceded !== gross ? summaryRow("Ceded premium", fmtFull(ceded)) : "");
-
-  return summarySection("Structure & terms", rows);
-}
-
-/** Who is on the slip, and for how much. */
 function panelSummary() {
-  const signed = Object.entries(draft.markets).filter(([, line]) => line > 0);
-  const total = signedTotal();
+  const units = capacityUnits(asProgram(), fmt);
+  return units.map((u) => section(isXol() ? u.label : "Market panel",
+    (u.entries.length ? u.entries.map((mc) => srow(mc.m, `${mc.offered != null && mc.offered !== "" ? `offered ${mc.offered}% · ` : ""}signed ${mc.line}%`)).join("")
+      : `<div class="summary-row"><span class="muted">No markets</span><span>—</span></div>`)
+    + srow("Signed lines", `${u.signed}%`, u.signedComplete ? "emphasis good" : "emphasis bad"))).join("");
+}
 
-  const rows = signed.length
-    ? signed.map(([name, line]) => summaryRow(name, `${line}%`)).join("")
-    : `<div class="summary-row"><span class="muted">No markets selected</span><span>—</span></div>`;
-
-  return summarySection("Market panel", rows
-    + summaryRow("Total signed lines", `${total}%`, total === 100 ? "emphasis good" : "emphasis bad"));
+function reviewBanner(program, complete) {
+  const user = currentUser();
+  if (!complete.complete) return `<div class="banner warn">${icons.info}${complete.reason} You can save the draft; it cannot go for approval until then.</div>`;
+  const authority = releaseAuthority({ preparedBy: editingId ? programById(editingId)?.preparedBy : { id: user.id } }, user);
+  return `<div class="banner">${icons.check}Capacity is fully signed. Save keeps it as a draft; submit puts it in the internal approval queue${
+    authority.allowed ? "; place sends it to the market now" : ""}. Nothing reaches a market without an authorised signatory.</div>`;
 }
 
 const stepReview = () => {
-  const total = signedTotal();
-  const placed = total === 100;
-  return `<div class="banner${placed ? "" : " warn"}">${placed ? icons.check : icons.info}${
-      placed
-        ? "Saving puts this in your drafts. Nothing goes to market yet — an authorised signatory reviews and releases the slip."
-        : `Signed lines total ${total}%. You can save the draft, but it cannot go for approval until the panel is placed at exactly 100%.`
-    }</div>`
-    + `<div class="summary">${riskSummary()}${termsSummary()}${panelSummary()}</div>`;
+  const program = asProgram();
+  const complete = readyState();
+  const premium = estimatedGrossPremium(draft.type, draft.terms);
+  return reviewBanner(program, complete)
+    + `<div class="summary">
+      ${section("Risk", srow("Cedant", draft.cedant) + srow("Class of business", draft.cls) + srow("Placement type", typeBadge(draft.type)))}
+      ${section("Terms", srow("Insured", draft.terms.insured || "—") + srow("Sum insured", fmtFull(draft.terms.sumInsured, draft.ccy))
+        + srow("Rate", draft.terms.rate != null ? `${draft.terms.rate}%` : "<span class='muted'>to be quoted</span>")
+        + srow("Payment warranty", paymentWarrantyLine(draft.terms.paymentWarrantyDays))
+        + srow("Structure", structureLine(draft.type, draft.terms, isXol() ? draft.layers : null))
+        + srow("Estimated gross premium", premium ? fmtFull(premium, draft.ccy) : "—", "emphasis"))}
+      ${panelSummary()}
+    </div>`;
 };
+
+/** Signed-line readiness through the domain rule, not a local sum. */
+function readyState() {
+  // Lazy import avoided: slip-approval is already loaded via lifecycle.
+  const units = capacityUnits(asProgram());
+  const entries = units.flatMap((u) => u.entries);
+  if (!entries.length) return { complete: false, reason: "Name at least one market on the slip." };
+  const empty = isXol() ? draft.layers.findIndex((l) => !l.markets.length) : -1;
+  if (empty >= 0) return { complete: false, reason: `Layer ${empty + 1} has no markets.` };
+  const short = units.find((u) => !u.signedComplete);
+  if (short) return { complete: false, reason: `${isXol() ? short.label : "Signed lines"} total ${short.signed}%, not 100%.` };
+  const warranty = paymentWarrantyCheck({ terms: draft.terms });
+  if (!warranty.ok) return { complete: false, reason: warranty.reason };
+  return { complete: true, reason: null };
+}
 
 const STEPS = [stepRiskBasics, stepTerms, stepMarketPanel, stepReview];
 
 /* ---------- shell ---------- */
 
+function finalButtons() {
+  const complete = readyState().complete;
+  const user = currentUser();
+  const existing = editingId ? programById(editingId) : null;
+  const preparer = existing?.preparedBy || { id: user.id };
+  const canPlace = complete && releaseAuthority({ preparedBy: preparer }, user).allowed
+    && canReleaseSlip({ ...asProgram(), preparedBy: preparer, status: STATUS.PENDING_APPROVAL }, cedantNamed(draft.cedant), user);
+  return `<button class="btn" data-wiz="save">Save draft</button>
+    <button class="btn${canPlace ? "" : " primary"}" data-wiz="submit"${complete ? "" : " disabled"} title="Puts the slip in the internal approval queue">Submit for internal approval</button>
+    ${canPlace ? `<button class="btn primary" data-wiz="place" title="Runs the four-eyes release gate and places the slip">Place to market</button>` : ""}`;
+}
+
 function shell() {
   return `<div class="modal-backdrop">
-    <div class="modal">
+    <div class="modal" style="max-width:${step === 2 && isXol() ? "760px" : "640px"};">
       <div class="modal-head">
         <div>
-          <div class="panel-title" style="margin:0;">New Submission</div>
+          <div class="panel-title" style="margin:0;">${editingId ? `Complete ${editingId}` : "New Placement"}</div>
           <div class="panel-sub" style="margin:2px 0 0;">Step ${step + 1} of 4 · ${STEP_LABELS[step]}</div>
         </div>
         <button class="close-x" data-action="close-modal">✕</button>
@@ -268,35 +270,33 @@ function shell() {
       <div class="modal-body" id="wizard-body">${STEPS[step]()}</div>
       <div class="modal-foot">
         <div class="step-dots">${[0, 1, 2, 3].map((i) => `<span class="${i <= step ? "active" : ""}"></span>`).join("")}</div>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
           <button class="btn" data-wiz="back" ${step === 0 ? "disabled" : ""}>Back</button>
-          <button class="btn primary" data-wiz="next">${step === 3 ? "Save draft" : "Continue"}</button>
+          ${step === 3 ? finalButtons() : `<button class="btn primary" data-wiz="next">Continue</button>`}
         </div>
       </div>
     </div>
   </div>`;
 }
 
-/** Wire the step's own inputs plus the footer controls. */
+/* ---------- wiring ---------- */
+
 function wire() {
   const body = $("#wizard-body");
 
   body.addEventListener("change", (e) => {
     if (e.target.id === "w-cedant") draft.cedant = e.target.value;
     if (e.target.id === "w-class") draft.cls = e.target.value;
-    if (e.target.id === "w-type") draft.type = e.target.value;
+    if (e.target.id === "w-type") { draft.type = e.target.value; }
   });
 
-  // --- step 3: search, add, drop --------------------------------------
   const search = $("#w-market-search");
   if (search) {
     search.addEventListener("input", (e) => {
       marketQuery = e.target.value;
-      // Only the result list changes, so the search box keeps focus and caret.
       mount("#w-market-results", marketResults(marketQuery));
     });
     search.addEventListener("keydown", (e) => {
-      // Enter adds the single obvious match rather than submitting the step.
       if (e.key !== "Enter") return;
       e.preventDefault();
       const [first] = marketMatches(marketQuery);
@@ -308,49 +308,65 @@ function wire() {
     const add = e.target.closest("[data-add-market]");
     if (add) return addMarket(add.dataset.addMarket);
     const drop = e.target.closest("[data-drop-market]");
-    if (drop) {
-      delete draft.markets[drop.dataset.dropMarket];
-      repaintPanel();
+    if (drop) { currentPanel().splice(Number(drop.dataset.dropMarket), 1); return repaintPanel(); }
+    const tab = e.target.closest("[data-layer]");
+    if (tab) { activeLayer = Number(tab.dataset.layer); marketQuery = ""; return repaint(); }
+    if (e.target.closest("[data-add-layer]")) {
+      const last = draft.layers.at(-1);
+      draft.layers.push({ limit: 0, attachment: (Number(last.attachment) || 0) + (Number(last.limit) || 0), markets: [] });
+      activeLayer = draft.layers.length - 1; marketQuery = "";
+      return repaint();
+    }
+    const rm = e.target.closest("[data-remove-layer]");
+    if (rm && draft.layers.length > 1) {
+      draft.layers.splice(Number(rm.dataset.removeLayer), 1);
+      activeLayer = Math.max(0, Math.min(activeLayer, draft.layers.length - 1));
+      return repaint();
     }
   });
 
-  // Line edits update the total without repainting the field being typed in.
-  $$("#wizard-selected-scope [data-m], #w-market-selected [data-m]").forEach((input) => {
-    input.addEventListener("input", () => {
-      draft.markets[input.dataset.m] = Math.max(0, Math.min(100, +input.value || 0));
-      const total = signedTotal();
-      const label = $("#w-total");
-      if (!label) return;
-      label.textContent = total + "%";
-      label.style.color = total === 100 ? "var(--good)" : total > 100 ? "var(--bad)" : "var(--warn)";
-    });
+  body.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.dataset.alloc) {
+      const mc = currentPanel()[Number(t.dataset.i)];
+      if (!mc) return;
+      const v = t.value === "" ? null : Math.max(0, Math.min(100, Number(t.value) || 0));
+      if (t.dataset.alloc === "offered") mc.offered = v; else mc.line = v ?? 0;
+      mount("#w-capacity", capacityLine());
+      if (isXol()) mount("#w-layer-tabs", layerTabs());
+    }
+    if (t.id === "w-limit" || t.id === "w-att") {
+      const l = draft.layers[activeLayer];
+      l.limit = Number($("#w-limit").value) || 0;
+      l.attachment = Number($("#w-att").value) || 0;
+      const label = $("#w-layer-label");
+      if (label) label.textContent = layerLabel(l, fmt);
+      mount("#w-layer-tabs", layerTabs());
+    }
   });
 
   $("[data-wiz='back']").addEventListener("click", back);
-  $("[data-wiz='next']").addEventListener("click", next);
+  $("[data-wiz='next']")?.addEventListener("click", next);
+  $("[data-wiz='save']")?.addEventListener("click", () => finish("save"));
+  $("[data-wiz='submit']")?.addEventListener("click", () => finish("submit"));
+  $("[data-wiz='place']")?.addEventListener("click", () => finish("place"));
 }
 
-/** Put a market on the slip, clear the search, and hand focus to its line. */
 function addMarket(name) {
-  if (!(name in draft.markets)) draft.markets[name] = 0;
+  const list = currentPanel();
+  if (!list.some((mc) => mc.m === name)) list.push({ m: name, offered: null, line: 0 });
   marketQuery = "";
   repaintPanel();
-  $(`[data-m="${CSS.escape(name)}"]`)?.focus();
+  $$(`[data-alloc="line"]`).at(-1)?.focus();
 }
 
-/** Repaint step 3 in place — the modal shell and footer stay as they are. */
 function repaintPanel() {
   const search = $("#w-market-search");
   if (search) search.value = marketQuery;
   mount("#w-market-results", marketResults(marketQuery));
-  mount("#w-market-selected", selectedMarkets());
-  const total = signedTotal();
-  const label = $("#w-total");
-  if (label) {
-    label.textContent = total + "%";
-    label.style.color = total === 100 ? "var(--good)" : total > 100 ? "var(--bad)" : "var(--warn)";
-  }
-  wire();
+  mount("#w-market-selected", allocationRows(currentPanel()));
+  mount("#w-capacity", capacityLine());
+  if (isXol()) mount("#w-layer-tabs", layerTabs());
 }
 
 const repaint = () => updateModal(shell(), { onMount: wire });
@@ -360,50 +376,74 @@ function back() {
   if (step > 0) { step--; repaint(); }
 }
 
+function fail(inputSel, hintSel, message) {
+  const input = $(inputSel);
+  input?.closest(".field")?.classList.add("has-error");
+  const hint = $(hintSel);
+  if (hint) hint.outerHTML = `<div class="field-error" id="${hint.id}">${message}</div>`;
+  input?.focus();
+}
+
 function next() {
   if (step === 0) {
     const typed = $("#w-cedant").value.trim();
-    // A slip has to name a cedant the registry knows, or nothing downstream —
-    // the KYC gate, the portal, the technical account — can resolve it.
     const match = state.cedants.find((c) => c.name.toLowerCase() === typed.toLowerCase());
-    if (!match) {
-      $("#w-cedant").closest(".field").classList.add("has-error");
-      $("#w-cedant-hint").outerHTML =
-        `<div class="field-error" id="w-cedant-hint">${typed ? `"${typed}" is not on the registry. Add them under Registry → Cedants first.` : "Choose a cedant."}</div>`;
-      $("#w-cedant").focus();
-      return;
-    }
+    if (!match) return fail("#w-cedant", "#w-cedant-hint", typed ? `"${typed}" is not on the registry. Add them under Registry → Cedants first.` : "Choose a cedant.");
     draft.cedant = match.name;
     draft.cls = $("#w-class").value;
     draft.type = $("#w-type").value;
-    draft.uwy = $("#w-uwy").value;
   }
-  // Read the terms back before the step's inputs are replaced.
-  if (step === 1) captureTerms();
-  if (step < 3) { step++; repaint(); return; }
-
-  // Final step saves a draft — it does not go to market, and it does not bind.
-  const id = saveDraft({
-    cedant: draft.cedant || state.cedants[0].name,
-    cls: draft.cls || "Property",
-    type: draft.type,
-    structure: structureLine(draft.type, draft.terms),
-    premium: estimatedGrossPremium(draft.type, draft.terms),
-    terms: draft.terms,
-    markets: draft.markets,
-  });
-  closeModal();
-  onIssued?.(id);
+  if (step === 1) {
+    captureTerms();
+    if (!draft.terms.insured) { $("#w-insured").closest(".field").classList.add("has-error"); $("#w-insured").focus(); return; }
+    if (!(draft.terms.sumInsured > 0)) { $("#w-si").closest(".field").classList.add("has-error"); $("#w-si").focus(); return; }
+    if (!isValidPaymentWarranty(draft.terms.paymentWarrantyDays)) return fail("#w-warranty", "#w-warranty-hint", "Select the agreed payment warranty period.");
+  }
+  if (step === 2 && isXol()) {
+    const bad = draft.layers.findIndex((l) => !(Number(l.limit) > 0) || Number(l.attachment) < 0);
+    if (bad >= 0) { activeLayer = bad; repaint(); $("#w-limit")?.closest(".field")?.classList.add("has-error"); return; }
+  }
+  if (step < 3) { step++; marketQuery = ""; repaint(); }
 }
 
 /**
- * Open the wizard.
- * @param {(programId:string) => void} [onIssue] called with the new program id.
+ * Final actions. Save always works. Submit requires capacity at 100%. Place
+ * runs the real release gate in the service — if the gate refuses, the slip is
+ * left in the approval queue and the drawer explains why.
  */
-export function openWizard(onIssue) {
-  step = 0;
-  draft = { type: "Facultative", markets: {} };
-  marketQuery = "";
-  onIssued = onIssue || null;
+function finish(mode) {
+  const payload = {
+    cedant: draft.cedant, cls: draft.cls, type: draft.type, ccy: draft.ccy,
+    terms: { ...draft.terms },
+    markets: isXol() ? [] : draft.markets.filter((mc) => mc.m),
+    layers: isXol() ? draft.layers : null,
+  };
+  let id = editingId;
+  if (id) updateDraft(id, payload); else id = saveDraft(payload);
+  if (mode === "submit" || mode === "place") {
+    if (normaliseStatus(programById(id).status) === STATUS.DRAFT) submitForApproval(id);
+  }
+  if (mode === "place") releaseSlip(id);
+  closeModal();
+  onSaved?.(id);
+}
+
+/**
+ * Open the wizard, blank or to complete an existing Draft Slip.
+ * @param {(programId:string) => void} [onIssue] called with the program id.
+ * @param {{ programId?: string }} [opts]
+ */
+export function openWizard(onIssue, { programId } = {}) {
+  step = 0; marketQuery = ""; activeLayer = 0; editingId = null;
+  draft = blankDraft();
+  const existing = programId ? programById(programId) : null;
+  if (existing && normaliseStatus(existing.status) === STATUS.DRAFT && EDITABLE_PLACEMENT_TYPES.includes(existing.type)) {
+    editingId = existing.id;
+    draft.cedant = existing.cedant; draft.cls = existing.cls; draft.type = existing.type; draft.ccy = existing.ccy || "USD";
+    draft.terms = { insured: "", sumInsured: 0, rate: null, paymentWarrantyDays: null, ...(existing.terms || {}) };
+    if (existing.layers?.length) draft.layers = existing.layers.map((l) => ({ limit: l.limit, attachment: l.attachment, markets: (l.markets || []).map((mc) => ({ m: mc.m, offered: mc.offered ?? null, line: mc.line || 0 })) }));
+    draft.markets = (existing.marketConfirmations || []).filter((mc) => mc.layer == null).map((mc) => ({ m: mc.m, offered: mc.offered ?? null, line: mc.line || 0 }));
+  }
+  onSaved = onIssue || null;
   openModal(shell(), { onMount: wire });
 }

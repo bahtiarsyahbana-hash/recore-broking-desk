@@ -79,8 +79,16 @@ export function exposureByReinsurer(programs) {
   const byMarket = {};
   programs.forEach((p) => {
     const premium = toBase(p.premium, p.ccy);
-    p.marketConfirmations.forEach((mc) => {
-      byMarket[mc.m] = (byMarket[mc.m] || 0) + premium * (mc.line || 0) / 100;
+    // A layered (XoL) placement apportions its premium to layers by limit, so a
+    // 40% line on a small top layer is not read as 40% of the whole premium.
+    const layers = Array.isArray(p.layers) && p.layers.length ? p.layers : null;
+    const totalLimit = layers ? layers.reduce((s, l) => s + (Number(l.limit) || 0), 0) : 0;
+    (p.marketConfirmations || []).forEach((mc) => {
+      let base = premium;
+      if (layers && mc.layer != null && totalLimit > 0) {
+        base = premium * (Number(layers[mc.layer]?.limit) || 0) / totalLimit;
+      }
+      byMarket[mc.m] = (byMarket[mc.m] || 0) + base * (mc.line || 0) / 100;
     });
   });
   return byMarket;

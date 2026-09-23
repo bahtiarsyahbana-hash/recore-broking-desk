@@ -24,6 +24,7 @@ export const TOPICS = {
   BORDEREAUX: "bordereaux:changed",
   FINANCE: "finance:changed",
   SUBMISSIONS: "submissions:changed",
+  INTAKES: "intakes:changed",
   REGISTRY: "registry:changed",
   ROLE: "role:changed",
   SEAT: "seat:changed",

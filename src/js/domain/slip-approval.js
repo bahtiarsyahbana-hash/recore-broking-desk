@@ -11,16 +11,36 @@
  * Pure: takes a placement and its cedant record, returns findings.
  */
 import { releaseAuthority, approverHint, usedOverride } from "./authority.js";
+import { capacityUnits, panelEntries, signedLinesComplete, REQUIRED_SIGNED_LINES } from "./panel.js";
+import { isValidPaymentWarranty, PAYMENT_WARRANTY_DAYS } from "./intake.js";
 
-/** Signed lines must add to exactly this before a slip may be released. */
-export const REQUIRED_SIGNED_LINES = 100;
+/**
+ * A slip cannot be issued without the agreed payment warranty. Historical
+ * records without the field stay readable, but cannot be newly submitted or
+ * re-placed until it is completed — and it is never defaulted for them.
+ */
+export function paymentWarrantyCheck(program) {
+  const days = program.terms?.paymentWarrantyDays;
+  if (isValidPaymentWarranty(days)) return { ok: true, reason: null, days: Number(days) };
+  return {
+    ok: false, days: null,
+    reason: days == null || days === ""
+      ? `Payment warranty is not set. Choose the agreed period (${PAYMENT_WARRANTY_DAYS.join(", ")} days) before this slip can be issued.`
+      : `Payment warranty "${days}" is not a supported period. Choose one of ${PAYMENT_WARRANTY_DAYS.join(", ")} days.`,
+  };
+}
 
-/** Rounding tolerance, so 33.33 × 3 is not treated as a shortfall. */
-const TOLERANCE = 0.01;
+export { REQUIRED_SIGNED_LINES };
 
-/** Total of the signed lines named on the slip. */
+/**
+ * Total of the signed lines named on the slip. For a layered placement this is
+ * the average across layers — a single figure for display only; the gate below
+ * checks every layer on its own.
+ */
 export function signedLines(program) {
-  return program.marketConfirmations.reduce((sum, mc) => sum + (mc.line || 0), 0);
+  const units = capacityUnits(program);
+  if (!units.length) return 0;
+  return units.reduce((sum, u) => sum + u.signed, 0) / units.length;
 }
 
 /**
@@ -34,17 +54,16 @@ export function signedLines(program) {
  * @param {object} user              the seat attempting the release
  */
 export function releaseChecklist(program, cedant, user) {
-  const panel = program.marketConfirmations;
-  const lines = signedLines(program);
-  const shortfall = REQUIRED_SIGNED_LINES - lines;
+  const panel = panelEntries(program);
+  const complete = signedLinesComplete(program);
+  const units = capacityUnits(program);
   const authority = releaseAuthority(program, user);
+  const warranty = paymentWarrantyCheck(program);
 
-  const linesState =
-    Math.abs(shortfall) <= TOLERANCE ? "done" : "blocking";
-  const linesDetail =
-    Math.abs(shortfall) <= TOLERANCE ? `${lines.toFixed(0)}% placed`
-    : shortfall > 0 ? `${lines.toFixed(0)}% placed — ${shortfall.toFixed(0)}% short`
-    : `${lines.toFixed(0)}% placed — ${Math.abs(shortfall).toFixed(0)}% oversubscribed`;
+  const linesState = complete.complete ? "done" : "blocking";
+  const linesDetail = complete.complete
+    ? (units.length > 1 ? `${units.length} layers each placed at 100%` : "100% placed")
+    : complete.reason;
 
   return [
     {
@@ -55,9 +74,15 @@ export function releaseChecklist(program, cedant, user) {
     },
     {
       key: "lines",
-      label: "Signed lines total 100%",
+      label: units.length > 1 ? "Signed lines total 100% on every layer" : "Signed lines total 100%",
       state: linesState,
       detail: linesDetail,
+    },
+    {
+      key: "warranty",
+      label: "Payment warranty agreed",
+      state: warranty.ok ? "done" : "blocking",
+      detail: warranty.ok ? `${warranty.days} days` : warranty.reason,
     },
     {
       key: "kyc",
@@ -100,15 +125,9 @@ export const canReleaseSlip = (program, cedant, user) =>
  * is by definition not the one who will release it.
  */
 export function readyToSubmit(program) {
-  const lines = signedLines(program);
-  if (!program.marketConfirmations.length) {
-    return { ready: false, reason: "Name at least one market on the slip before submitting it." };
-  }
-  if (Math.abs(REQUIRED_SIGNED_LINES - lines) > TOLERANCE) {
-    return {
-      ready: false,
-      reason: `Signed lines total ${lines.toFixed(0)}%. A slip must be placed at exactly 100% before it goes for approval.`,
-    };
-  }
+  const complete = signedLinesComplete(program);
+  if (!complete.complete) return { ready: false, reason: complete.reason };
+  const warranty = paymentWarrantyCheck(program);
+  if (!warranty.ok) return { ready: false, reason: warranty.reason };
   return { ready: true, reason: null };
 }
