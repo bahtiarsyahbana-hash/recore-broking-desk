@@ -19,3 +19,4 @@ npm-debug.log*
 # Reference workbook is unzipped here to regenerate data; only the generated
 # JavaScript is committed, so the diff shows what changed in the data.
 scripts/import/workbook/
+.vercel
