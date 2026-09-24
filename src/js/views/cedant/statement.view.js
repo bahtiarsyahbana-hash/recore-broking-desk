@@ -30,7 +30,7 @@ export const cedantStatementView = {
 
   render: () => `<section class="view">
     <div class="view-head">
-      <div><h1>Account Statement</h1><p>Your treaty account with ${BROKING_FIRM}, current underwriting year.</p></div>
+      <div><h1>Account Statement</h1><p>Your treaty account with ${BROKING_FIRM}.</p></div>
     </div>
     <div class="card" style="max-width:560px;">
       <div class="calc-out" id="c-statement-out"></div>

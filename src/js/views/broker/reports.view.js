@@ -81,7 +81,7 @@ export const reportsView = {
 
   render: () => `<section class="view">
     <div class="view-head">
-      <div><h1>Reports &amp; Exposure</h1><p>Loss ratio by program and accumulation across the reinsurer panel.</p></div>
+      <div><h1>Reports &amp; Exposure</h1><p>Loss ratio by program and panel accumulation.</p></div>
     </div>
     <div class="cols-2">
       <div class="card">

@@ -64,7 +64,7 @@ export const accountingView = {
     <div class="view-head">
       <div>
         <h1>Accounting &amp; Finance</h1>
-        <p>One running technical account per program, and the invoices, credit notes and debit notes that flow from every bind, endorsement and cancellation.</p>
+        <p>Technical accounts and finance documents.</p>
       </div>
     </div>
     <div class="tabs" id="acc-tabs">

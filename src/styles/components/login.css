@@ -11,12 +11,8 @@
   padding:32px; box-shadow:var(--shadow);
 }
 .login-brand{ display:flex; align-items:center; gap:11px; margin-bottom:26px; }
-.login-brand .mark{
-  width:36px; height:36px; border-radius:9px; flex:none; color:#fff;
-  background:linear-gradient(155deg,var(--marine),var(--marine-ink));
-  display:flex; align-items:center; justify-content:center;
-  font-family:'Fraunces',serif; font-weight:600; font-size:19px;
-}
+.login-brand .mark{ width:40px; height:40px; flex:none; color:var(--marine-ink); display:flex; align-items:center; justify-content:center; }
+.login-brand .mark svg{ width:100%; height:100%; display:block; }
 .login-brand .name{ font-family:'Fraunces',serif; font-weight:600; font-size:19px; }
 .login-brand .sub{
   font-size:11px; color:var(--ink-soft); letter-spacing:.04em; text-transform:uppercase;

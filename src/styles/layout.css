@@ -1,9 +1,21 @@
 /* App shell: grid, sidebar, topbar, view container. */
-.app{ display:grid; grid-template-columns:236px 1fr; min-height:100vh; }
-.brand{ display:flex; align-items:center; gap:10px; padding:18px 20px 14px; border-bottom:1px solid var(--line); }
-.brand .mark{ width:30px; height:30px; border-radius:8px; background:linear-gradient(155deg,var(--marine),var(--marine-ink)); display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Fraunces',serif; font-weight:600; font-size:16px; flex:none; }
+/* The brand block and the top bar share one height, so their bottom rules
+   meet as a single line across the shell. */
+:root{ --shell-head:64px; }
+.app{ display:grid; grid-template-columns:236px 1fr; min-height:100vh; transition:grid-template-columns .2s ease; }
+.brand{ display:flex; align-items:center; gap:10px; height:var(--shell-head); flex:none; padding:0 20px; border-bottom:1px solid var(--line); min-width:0; }
+/* The swirl mark inherits the brand navy; on dark it lifts to the accent. */
+.brand .mark{ width:32px; height:32px; flex:none; color:var(--marine-ink); display:flex; align-items:center; justify-content:center; }
+/* The mark is also the collapse control. */
+.brand-toggle{ padding:0; border:none; background:none; cursor:pointer; border-radius:50%; transition:transform .2s ease; }
+.brand-toggle:hover{ transform:rotate(-24deg); }
+.brand-toggle:focus-visible{ outline:2px solid var(--marine); outline-offset:3px; }
+.brand-text{ min-width:0; }
+.brand .mark svg{ width:100%; height:100%; display:block; }
+:root[data-theme="dark"] .brand .mark{ color:var(--marine); }
 .brand .name{ font-family:'Fraunces',serif; font-weight:600; font-size:17px; }
-.brand .sub{ font-size:11px; color:var(--ink-soft); letter-spacing:.04em; text-transform:uppercase; }
+/* One line at the full sidebar width; ellipsis only as a safety net. */
+.brand .sub{ font-size:9.5px; color:var(--ink-soft); letter-spacing:.03em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .sidebar{ background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto; }
 .nav{ padding:10px; display:flex; flex-direction:column; gap:2px; flex:1; }
@@ -15,8 +27,20 @@
 .nav-item.active svg{ opacity:1; }
 .sidebar-foot{ padding:12px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-soft); }
 
+/* ---- collapsed: an icon rail --------------------------------------------
+   Labels hide, each item keeps its tooltip and accessible name, and section
+   headings become a thin divider so the grouping still reads. */
+.app.sidebar-collapsed{ grid-template-columns:64px 1fr; }
+.app.sidebar-collapsed .brand{ justify-content:center; padding:0; }
+.app.sidebar-collapsed .brand-text,
+.app.sidebar-collapsed .nav-text,
+.app.sidebar-collapsed .sidebar-foot{ display:none; }
+.app.sidebar-collapsed .nav{ padding:10px 8px; }
+.app.sidebar-collapsed .nav-item{ justify-content:center; padding:10px 0; }
+.app.sidebar-collapsed .nav-label{ font-size:0; padding:0; margin:8px 10px; border-top:1px solid var(--line); }
+
 .main{ min-width:0; }
-.topbar{ position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.topbar{ position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--line); min-height:var(--shell-head); padding:8px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
 .roleswitch{ display:flex; background:var(--surface-2); border-radius:999px; padding:3px; gap:2px; }
 .roleswitch button{ border:none; background:none; padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
 .roleswitch button.active{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
@@ -28,7 +52,9 @@
 .view{ padding:22px 24px 60px; max-width:1240px; }
 .view-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:18px; flex-wrap:wrap; }
 .view-head h1{ font-size:23px; font-weight:600; }
-.view-head p{ margin:4px 0 0; color:var(--ink-soft); font-size:13px; max-width:56ch; }
+/* Every page subtitle is one line by design; ellipsis only as a safety net. */
+.view-head p{ margin:4px 0 0; color:var(--ink-soft); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.view-head > div:first-child{ min-width:0; }
 
 /* Acting seat. Slip release is four-eyes, so who is at the desk is a control
    rather than a display preference, and it sits in the top bar beside it. */

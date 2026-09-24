@@ -8,6 +8,7 @@
  * Which portal opens, and what authority applies, both follow from who signs
  * in — there is no role or seat switcher once you are inside.
  */
+import { brandMark } from "./brand.js";
 import { $, $$, mount, onAction } from "../core/dom.js";
 import { authenticate } from "../domain/session.js";
 import { brokerUsers, cedantUsers } from "../data/users.data.js";
@@ -44,7 +45,7 @@ function screen(error) {
   return `<div class="login">
     <div class="login-panel">
       <div class="login-brand">
-        <div class="mark">R</div>
+        <div class="mark">${brandMark("bm-login-")}</div>
         <div>
           <div class="name">Recordes</div>
           <div class="sub">Reinsurance Broking Desk</div>

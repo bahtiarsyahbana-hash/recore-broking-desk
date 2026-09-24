@@ -183,7 +183,7 @@ export const placementsView = {
     <div class="view-head">
       <div>
         <h1>Placements</h1>
-        <p>Facultative placements from draft slip to bound — quota share and excess of loss, with the historical book alongside.</p>
+        <p>Facultative placements from draft slip to bound.</p>
       </div>
       <button class="btn primary" data-action="new-submission">${icons.plus}New Placement</button>
     </div>

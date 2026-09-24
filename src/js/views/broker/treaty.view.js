@@ -137,7 +137,7 @@ export const treatyView = {
   render: () => `<section class="view">
     <div class="view-head">
       <div><h1>Treaty Engine</h1>
-        <p>Treaty agreements negotiated and bound outside Recordes, registered here as master records and administered through their bordereaux, cessions, accounts and settlements.</p></div>
+        <p>Treaty agreements bound outside Recordes.</p></div>
       <button class="btn primary" data-action="register">${icons.plus}Register Treaty Agreement</button>
     </div>
     <div class="tabs" id="treaty-tabs">${WORKSTREAMS.map(([k, l]) => `<div class="tab${k === workstream ? " active" : ""}" data-w="${k}" role="tab">${l}</div>`).join("")}</div>

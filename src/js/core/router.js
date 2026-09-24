@@ -11,6 +11,7 @@ import { state, currentUser, currentPortal } from "./store.js";
 import { emit, TOPICS } from "./events.js";
 import { roleChrome, ROLES } from "./navigation.js";
 import { UNDERWRITING_YEAR, BASE_CURRENCY, BROKING_FIRM } from "./config.js";
+import { initSidebarToggle } from "../ui/sidebar.js";
 
 const views = new Map();
 let currentView = null;
@@ -28,7 +29,7 @@ function renderNav(container, entries) {
   container.innerHTML = entries.map((entry) =>
     entry.section
       ? `<div class="nav-label">${typeof entry.section === "function" ? entry.section() : entry.section}</div>`
-      : `<button class="nav-item" data-view="${entry.view}">${entry.icon}${entry.label}</button>`
+      : `<button class="nav-item" data-view="${entry.view}" title="${entry.label}">${entry.icon}<span class="nav-text">${entry.label}</span></button>`
   ).join("");
 }
 
@@ -97,6 +98,8 @@ export function initShell() {
     const item = e.target.closest(".nav-item");
     if (item) showView(item.dataset.view);
   });
+
+  initSidebarToggle();
 
 }
 

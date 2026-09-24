@@ -28,7 +28,7 @@ export const cedantSubmitView = {
 
   render: () => `<section class="view">
     <div class="view-head">
-      <div><h1>Submit a Risk or Renewal</h1><p>Sends a structured request straight into your broker's intake queue.</p></div>
+      <div><h1>Submit a Risk or Renewal</h1><p>Send a request to your broker's intake queue.</p></div>
     </div>
     <div class="card" style="max-width:560px;">
       <div class="field"><label>Insured name</label><input type="text" id="cs-insured" placeholder="Who is the cover for?"></div>

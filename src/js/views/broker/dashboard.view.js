@@ -75,7 +75,7 @@ export const dashboardView = {
     <div class="view-head">
       <div>
         <h1>Broking Desk</h1>
-        <p>Every program the desk is running this underwriting year — facultative and treaty, proportional and non-proportional, in one book.</p>
+        <p>The whole book for the current underwriting year.</p>
       </div>
       <button class="btn primary" data-action="new-submission">${icons.plus}New Submission</button>
     </div>

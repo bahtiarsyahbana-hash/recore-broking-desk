@@ -16,7 +16,7 @@ export const cedantBordereauView = {
 
   render: () => `<section class="view">
     <div class="view-head">
-      <div><h1>Upload Bordereau</h1><p>Submit your periodic premium or loss bordereau directly to the treaty account.</p></div>
+      <div><h1>Upload Bordereau</h1><p>Send your premium or loss bordereau.</p></div>
     </div>
     <div class="card" style="max-width:560px;">
       <div class="field-row">

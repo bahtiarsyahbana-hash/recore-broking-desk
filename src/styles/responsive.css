@@ -1,6 +1,12 @@
 /* Responsive overrides — narrow viewports collapse the shell to a single column. */
 @media (max-width:860px){
-  .app{ grid-template-columns:1fr; }
+  /* The menu strip keeps its own height; the view takes the rest, so a short
+     page does not stretch the strip to fill the screen. */
+  .app, .app.sidebar-collapsed{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  /* The phone layout is already a strip of labelled tabs; collapse does not apply. */
+  .app.sidebar-collapsed .nav-text{ display:inline; }
+  .app.sidebar-collapsed .nav-item{ justify-content:flex-start; padding:9px 10px; }
+  .app.sidebar-collapsed .nav-label{ display:none; }
   .sidebar{ position:static; height:auto; flex-direction:row; overflow-x:auto; }
   .brand{ display:none; }
   .nav{ flex-direction:row; padding:8px; }

@@ -65,7 +65,7 @@ export const intakeView = {
     <div class="view-head">
       <div>
         <h1>Intake</h1>
-        <p>Every request for cover in one queue — recorded by the desk or sent from the cedant portal — until it is accepted into a placement or declined.</p>
+        <p>Every request for cover, before it becomes a placement.</p>
       </div>
       <button class="btn primary" data-action="new-intake">${icons.plus}Record Intake</button>
     </div>

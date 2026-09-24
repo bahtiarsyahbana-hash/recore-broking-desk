@@ -44,7 +44,7 @@ export const claimsView = {
     <div class="view-head">
       <div>
         <h1>Claims</h1>
-        <p>Every claim tested against its program's layers automatically, with reserve movement tracked to the technical account.</p>
+        <p>Claims tested against their program's layers.</p>
       </div>
       <button class="btn primary" data-action="register">${icons.plus}Register Claim</button>
     </div>
