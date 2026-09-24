@@ -70,8 +70,10 @@ export function documentHtml(batch, doc) {
   h1{ margin:0; font-size:28px; font-weight:700; }
   .brand{ display:flex; align-items:center; gap:10px; font-weight:600; font-size:15px; text-align:right; }
   .brand svg{ width:36px; height:36px; color:#111; flex:none; }
-  .info{ display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:28px; }
-  .block{ margin-bottom:18px; } .block:last-child{ margin-bottom:0; }
+  .info{ display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start; margin:22px 0 18px; }
+  .info .block{ margin:0; }
+  .block{ margin-bottom:18px; }
+  .pay{ margin-bottom:26px; }
   .label{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#666; margin-bottom:4px; }
   .block p{ margin:0; } .strong{ font-weight:600; } .muted{ color:#666; font-size:11.5px; }
   dl{ display:grid; grid-template-columns:auto 1fr; gap:2px 14px; margin:0; } dt{ color:#666; } dd{ margin:0; }
@@ -92,20 +94,16 @@ export function documentHtml(batch, doc) {
     <h1>${esc(doc.docType)}</h1>
     <div class="brand">${brandMark("pd-")}<span>${esc(from.legalName)}</span></div>
   </div>
+  <div class="block"><div class="label">Information</div><dl>
+    <dt>${esc(doc.docType)} number</dt><dd>${esc(doc.id)}</dd>
+    <dt>Date issued</dt><dd>${esc(doc.issueDate)}</dd>
+    <dt>Date due</dt><dd>${esc(doc.dueDate || "—")}</dd>
+  </dl></div>
   <div class="info">
-    <div>
-      <div class="block"><div class="label">Information</div><dl>
-        <dt>${esc(doc.docType)} number</dt><dd>${esc(doc.id)}</dd>
-        <dt>Date issued</dt><dd>${esc(doc.issueDate)}</dd>
-        <dt>Date due</dt><dd>${esc(doc.dueDate || "—")}</dd>
-      </dl></div>
-      <div class="block"><div class="label">From</div>${party(from)}</div>
-      <div class="block"><div class="label">${isSlip ? "Remit to" : "Payment to"}</div><p>${payment}</p></div>
-    </div>
-    <div>
-      <div class="block"><div class="label">${isSlip ? "Payable to" : "Bill to"}</div>${party(to)}</div>
-    </div>
+    <div class="block"><div class="label">From</div>${party(from)}</div>
+    <div class="block"><div class="label">${isSlip ? "Payable to" : "Bill to"}</div>${party(to)}</div>
   </div>
+  <div class="block pay"><div class="label">${isSlip ? "Remit to" : "Payment to"}</div><p>${payment}</p></div>
   <table>
     <thead><tr><th>Description</th><th class="n">Tax</th><th class="n">Amount</th><th class="n">Total</th></tr></thead>
     <tbody>${rows}</tbody>

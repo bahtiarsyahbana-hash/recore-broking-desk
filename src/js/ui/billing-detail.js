@@ -4,7 +4,8 @@
  * Reads state and paints; every write goes through billing.service.js.
  */
 import { onAction } from "../core/dom.js";
-import { currentUser } from "../core/store.js";
+import { state, currentUser } from "../core/store.js";
+import { todayISO } from "../core/config.js";
 import { statusPill, financeBadge, subBadge } from "./badges.js";
 import { icons } from "./icons.js";
 import { openModal, updateModal, closeModal } from "./modal.js";
@@ -15,6 +16,12 @@ import { issueChecklist, issueAuthority, fromCents, formatShare, SOURCE_KINDS } 
 import {
   batchByRef, updateBatchTerms, submitBatch, returnBatch, issueBatch, markDocumentSent, raiseCancellation,
 } from "../services/billing.service.js";
+import { paymentOf, receiptsFor, remittancesFor, recordReceipt, reverseReceipt, checkReceipt } from "../services/payments.service.js";
+import { isReceivable } from "../domain/payments.js";
+import { openRemittanceDetail, accountOption, accountIdOf } from "./remittance-detail.js";
+
+/** This drawer's own element. Listeners bound here die with it, so they never fire for another drawer. */
+const drawerRoot = () => document.querySelector("#modal-root > .modal-backdrop");
 
 let openRef = null;
 const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -36,7 +43,7 @@ function nextStep(b) {
   if (b.status === "Issued") {
     const unsent = b.documents.filter((d) => d.delivery !== "Sent").length;
     return { title: unsent ? `Send ${unsent} document${unsent === 1 ? "" : "s"}` : "Issued and sent", detail: unsent ? "Print or save each document, send it to its counterparty, then mark it sent." : "Receipts and remittances follow in the next phase.",
-      primary: null, secondary: b.sourceKind !== "reversal" ? { action: "cancel", label: "Cancel by credit note" } : null, done: !unsent };
+      primary: null, secondary: b.sourceKind !== "reversal" && !state.billing.receipts.some((r) => r.batchRef === b.ref && !r.reversed) ? { action: "cancel", label: "Cancel by credit note" } : null, done: !unsent };
   }
   return { title: "Cancelled", detail: `Reversed by ${b.cancelledBy || "a reversing batch"}. Kept for the record.`, primary: null, secondary: null, done: true };
 }
@@ -74,12 +81,32 @@ function documentsView(b) {
   return draftDocs.map((d, i) => docBlock(b, d, i)).join("");
 }
 
+/** Cash received against the cedant document, and the remittances it drove. */
+function paymentsBlock(b) {
+  const doc = b.documents[0];
+  if (b.status !== "Issued" && b.status !== "Cancelled") return "";
+  if (!doc || !isReceivable(doc)) return "";
+  const pos = paymentOf(b.ref);
+  const receipts = receiptsFor(doc.id);
+  const rems = remittancesFor(b.ref);
+  const tone = pos.label === "Paid" ? "Paid" : pos.label === "Overdue" ? "Overdue" : pos.label === "Part paid" ? "Part paid" : "Pending";
+  return `<div class="panel-title" style="font-size:12.5px; margin-top:16px;">Payment ${statusPill(tone === "Pending" ? "Unpaid" : tone)}</div>
+    <div class="confirm-row"><span>Received</span><span class="mono">${money(pos.paid, b.ccy)}</span></div>
+    <div class="confirm-row"><span>Outstanding</span><span class="mono">${money(pos.outstanding, b.ccy)}</span></div>
+    ${b.status === "Issued" && pos.outstanding > 0 ? `<div class="next-action-actions" style="margin:8px 0 4px;"><button class="btn primary" data-action="receipt">Record receipt</button></div>` : ""}
+    ${receipts.map((r) => `<div class="confirm-row"><span><strong>${esc(r.ref)}</strong> · ${r.receivedDate}${r.bankRef ? ` · ${esc(r.bankRef)}` : ""}${r.reversed ? ` ${subBadge("Reversed", "bad")}` : ""}</span>
+      <span class="wrow-actions"><span class="mono">${money(r.cents, r.ccy)}</span>${r.reversed ? "" : `<button class="btn ghost" style="padding:3px 8px; font-size:11px;" data-action="reverse-receipt" data-ref="${r.ref}">Reverse</button>`}</span></div>`).join("")}
+    ${rems.length ? `<div class="panel-title" style="font-size:12.5px; margin-top:12px;">Remittances</div>
+      ${rems.map((m) => `<div class="confirm-row"><span><button class="btn ghost" style="padding:3px 8px; font-size:11px;" data-action="open-remittance" data-ref="${m.ref}">${esc(m.ref)}</button> ${esc(m.reinsurer)}</span>
+        <span class="wrow-actions"><span class="mono">${money(m.cents, m.ccy)}</span>${statusPill(m.status)}</span></div>`).join("")}` : ""}`;
+}
+
 function body(b) {
   const c = b.computed;
   const checks = issueChecklist(b);
   const trail = (label, who) => (who ? `<div class="confirm-row"><span>${label}</span><span class="prov-who">${esc(who.name)} · ${esc(who.title)}</span></div>` : "");
   return card(b) + `<div class="cols-2" style="margin-top:16px;">
-    <div><div class="panel-title" style="font-size:12.5px;">Documents</div>${documentsView(b)}</div>
+    <div><div class="panel-title" style="font-size:12.5px;">Documents</div>${documentsView(b)}${paymentsBlock(b)}</div>
     <div>
       <div class="panel-title" style="font-size:12.5px;">Terms</div>
       <div class="confirm-row"><span>Source</span><span>${esc(b.sourceLabel)}</span></div>
@@ -110,7 +137,7 @@ const shell = (b) => `<div class="modal-backdrop"><div class="modal" style="max-
   <div class="modal-body">${body(b)}</div></div></div>`;
 
 function wire() {
-  onAction("#modal-root", {
+  onAction(drawerRoot(), {
     submit: () => { submitBatch(openRef); repaint(); },
     issue: () => { issueBatch(openRef); repaint(); },
     return: () => openFormModal({ title: `Return ${openRef}`, fields: [{ name: "notes", label: "Reason", type: "textarea", rows: 3, required: true }], submitLabel: "Return",
@@ -134,6 +161,31 @@ function wire() {
     },
     print: ({ i }) => { const b = batchByRef(openRef); openPrintable(b, b.documents[Number(i)]); },
     sent: ({ i }) => { const b = batchByRef(openRef); markDocumentSent(openRef, b.documents[Number(i)].id); repaint(); },
+    receipt: () => {
+      const b = batchByRef(openRef);
+      const pos = paymentOf(openRef);
+      const accounts = state.billing.brokerAccounts.filter((a) => a.active !== false && a.ccy === b.ccy && a.purpose !== "Remittance");
+      openFormModal({
+        title: `Record receipt — ${b.documents[0].id}`, subtitle: `${money(pos.outstanding, b.ccy)} outstanding. A part-payment is split pro rata across the closing slips.`,
+        fields: [
+          { name: "amount", label: `Amount received (${b.ccy})`, type: "number", required: true, value: fromCents(pos.outstanding), half: true },
+          { name: "receivedDate", label: "Date received", type: "date", required: true, value: todayISO(), half: true },
+          { name: "accountId", label: "Received into", type: "select", options: accounts.length ? accounts.map(accountOption) : [""], value: accounts[0] ? accountOption(accounts[0]) : "",
+            hint: accounts.length ? "" : `No ${b.ccy} collection account. Add one under Finance → Broker Profile.` },
+          { name: "bankRef", label: "Bank reference", type: "text", placeholder: "From the bank statement" },
+          { name: "notes", label: "Notes", type: "textarea", rows: 2 },
+        ],
+        submitLabel: "Record receipt",
+        validate: (v) => { const e = checkReceipt(openRef, { ...v, accountId: accountIdOf(v.accountId) }); if (e.doc) e.amount = e.doc; return e; },
+        onSubmit: (v) => { recordReceipt(openRef, { ...v, accountId: accountIdOf(v.accountId) }); reopen(); },
+      });
+    },
+    "reverse-receipt": ({ ref }) => openFormModal({
+      title: `Reverse ${ref}`, subtitle: "Unpaid remittances drafted from it are cancelled with it. Refused if one has already been paid.",
+      fields: [{ name: "notes", label: "Reason", type: "textarea", rows: 3, required: true }], submitLabel: "Reverse receipt",
+      onSubmit: ({ notes }) => { reverseReceipt(ref, notes); reopen(); },
+    }),
+    "open-remittance": ({ ref }) => { const back = openRef; closeModal(); openRemittanceDetail(ref, () => openBillingDetail(back)); },
   });
 }
 

@@ -419,6 +419,20 @@ export function executeBinding(id, bindingInstructions) {
 export const approveAndBind = executeBinding;
 
 /**
+ * Credit control: whether the placement's premium is settled. Set by the
+ * payments service from receipts — true once every issued invoice and debit
+ * note for the placement is paid in full — and recorded when it changes.
+ */
+export function setPremiumPaid(id, paid, notes = "") {
+  const p = programById(id);
+  if (!p || Boolean(p.premiumPaid) === Boolean(paid)) return p || null;
+  p.premiumPaid = Boolean(paid);
+  record(p, paid ? "Premium settled" : "Premium outstanding again", notes);
+  emit(TOPICS.PROGRAMS, { id, action: "premium-paid" });
+  return p;
+}
+
+/**
  * Record an endorsement on a bound placement and draft its billing. The bound
  * terms stay frozen; the endorsement is its own dated record, and the premium
  * change is billed from the endorsement date.

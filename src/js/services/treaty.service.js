@@ -10,7 +10,7 @@ import { state, agreementById, nextTreatyRef, currentUser } from "../core/store.
 import { todayISO } from "../core/config.js";
 import { emit, TOPICS } from "../core/events.js";
 import { stamp } from "../domain/authority.js";
-import { createTreatyDraft } from "./billing.service.js";
+import { createTreatyDraft, batchesForSource } from "./billing.service.js";
 import {
   validateBasics, validateStructure, validatePanel, canActivate, canTransitionAgreement, acceptsTransactions,
   validatePremiumBordereau, validateClaimsBordereau, validateCession, validateTechnicalAccount, validateSettlement,
@@ -224,7 +224,16 @@ export const addPremiumBordereau = (b) => addRecord("premiumBordereaux", b);
 export const addClaimsBordereau = (b) => addRecord("claimsBordereaux", b);
 export const addCession = (c) => addRecord("cessions", c);
 export const addTechnicalAccount = (t) => addRecord("technicalAccounts", t);
-export const addSettlement = (s) => addRecord("settlements", s);
+/**
+ * A manual settlement. Refused for a technical account billed through
+ * Finance: its remittances are raised there from the cedant's receipts.
+ */
+export function addSettlement(s) {
+  if (s?.accountRef && batchesForSource("treaty", s.accountRef).some((b) => b.status !== "Cancelled")) {
+    return { errors: { accountRef: `${s.accountRef} is billed through Finance. Its remittances are raised there when the cedant pays.` } };
+  }
+  return addRecord("settlements", s);
+}
 
 /** Move a workstream record's status. Explicit, one step, recorded on the agreement. */
 const STATUS_FIELD = { premiumBordereaux: ["status", BORDEREAU_STATUSES], claimsBordereaux: ["status", BORDEREAU_STATUSES], cessions: ["status", CESSION_STATUSES], technicalAccounts: ["status", ACCOUNT_STATUSES], settlements: ["paymentStatus", SETTLEMENT_STATUSES] };

@@ -21,6 +21,8 @@ import { icons } from "../../ui/icons.js";
 import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 import { openFormModal } from "../../ui/form-modal.js";
 import { openBillingDetail } from "../../ui/billing-detail.js";
+import { openRemittanceDetail } from "../../ui/remittance-detail.js";
+import { paymentOf, taxesHeldByCurrency } from "../../services/payments.service.js";
 import {
   issuedDocuments, addTaxRule, updateTaxRule, removeTaxRule, addBrokerAccount, updateBrokerAccount, removeBrokerAccount,
   updateBrokerProfile,
@@ -32,11 +34,13 @@ import {
 import { SETTLEMENT_CURRENCIES } from "./registry-fields.js";
 import { BROKING_FIRM } from "../../core/config.js";
 
-const TABS = [["billing", "Billing Queue"], ["cedant", "Invoices & Notes"], ["slips", "Closing Slips"], ["accounts", "Broker Profile"], ["tax", "Tax Rules"], ["tech", "Technical Accounts"]];
+const TABS = [["billing", "Billing Queue"], ["cedant", "Invoices & Notes"], ["slips", "Closing Slips"], ["receipts", "Receipts"], ["remittances", "Remittances"], ["accounts", "Broker Profile"], ["tax", "Tax Rules"], ["tech", "Technical Accounts"]];
+const REM_FILTERS = { open: ["To action", (m) => m.status === "Draft" || m.status === "Pending Approval" || m.status === "Approved"], paid: ["Paid", (m) => m.status === "Paid"], cancelled: ["Cancelled", (m) => m.status === "Cancelled"], all: ["All", () => true] };
 const BATCH_FILTERS = { open: ["Open", (b) => b.status === "Draft" || b.status === "Pending Approval"], issued: ["Issued", (b) => b.status === "Issued"], cancelled: ["Cancelled", (b) => b.status === "Cancelled"], all: ["All", () => true] };
 
 let tab = "billing";
 let batchFilter = "open";
+let remFilter = "open";
 let selectedId = null;
 const pager = createPager(() => accountingView.refresh(), "finance");
 
@@ -73,11 +77,50 @@ function cedantTab() {
   const legacy = legacyDocs();
   const page = paginate([...issued, ...legacy], pager.page);
   const rows = page.items.map((d) => d.legacy
-    ? `<tr><td class="mono">${d.id}</td><td>${financeBadge(d.type)} ${subBadge("Legacy")}</td><td>${esc(d.program)}</td><td>${esc(d.counterparty)}</td><td class="num">${fmtFull(d.amount, d.ccy)}</td><td>${d.date}</td><td>—</td><td>—</td></tr>`
-    : `<tr class="reg-tr" data-action="open-batch" data-ref="${d.batchRef}" tabindex="0"><td class="mono">${d.id}</td><td>${financeBadge(d.docType)}${d.batchStatus === "Cancelled" ? ` ${subBadge("Cancelled", "bad")}` : ""}</td><td>${esc(d.sourceLabel)}</td><td>${esc(d.counterparty)}</td><td class="num">${money(d.total, d.ccy)}</td><td>${d.issueDate}</td><td>${d.dueDate || "—"}</td><td>${statusPill(d.delivery)}</td></tr>`);
+    ? `<tr><td class="mono">${d.id}</td><td>${financeBadge(d.type)} ${subBadge("Legacy")}</td><td>${esc(d.program)}</td><td>${esc(d.counterparty)}</td><td class="num">${fmtFull(d.amount, d.ccy)}</td><td>${d.date}</td><td>—</td><td>—</td><td>—</td></tr>`
+    : `<tr class="reg-tr" data-action="open-batch" data-ref="${d.batchRef}" tabindex="0"><td class="mono">${d.id}</td><td>${financeBadge(d.docType)}${d.batchStatus === "Cancelled" ? ` ${subBadge("Cancelled", "bad")}` : ""}</td><td>${esc(d.sourceLabel)}</td><td>${esc(d.counterparty)}</td><td class="num">${money(d.total, d.ccy)}</td><td>${d.issueDate}</td><td>${d.dueDate || "—"}</td><td>${statusPill(d.delivery)}</td><td>${paymentCell(d)}</td></tr>`);
   return `<div class="panel-sub">What each cedant received. Legacy documents were raised by the earlier desk directly to reinsurers and are read-only.</div>
-    ${table(["Doc #", "Type", "Source", "Counterparty", "#Amount", "Issued", "Due", "Delivery"], rows, "No documents issued yet.")}
+    ${table(["Doc #", "Type", "Source", "Counterparty", "#Amount", "Issued", "Due", "Delivery", "Payment"], rows, "No documents issued yet.")}
     ${paginationControls(page, { unit: "documents", name: "finance" })}`;
+}
+
+/** Payment position of an issued cedant document, for the documents table. */
+function paymentCell(d) {
+  if (d.docType === "Credit Note") return '<span class="muted">Refunds in a later phase</span>';
+  const pos = paymentOf(d.batchRef);
+  if (!pos) return "—";
+  return `${statusPill(pos.label)}${pos.outstanding && pos.paid ? `<div class="muted" style="font-size:11px;">${money(pos.outstanding, d.ccy)} left</div>` : ""}`;
+}
+
+/* ---------- receipts and remittances ---------- */
+
+function receiptsTab() {
+  const list = state.billing.receipts;
+  const page = paginate(list, pager.page);
+  const held = Object.entries(taxesHeldByCurrency()).filter(([, c]) => c);
+  const rows = page.items.map((r) => `<tr class="reg-tr" data-action="open-batch" data-ref="${r.batchRef}" tabindex="0">
+    <td><strong>${r.ref}</strong></td><td class="mono">${r.docId}</td><td>${esc(r.cedant)}</td><td class="num">${money(r.cents, r.ccy)}</td>
+    <td>${r.receivedDate}</td><td>${esc(r.account?.bankName)}<div class="muted" style="font-size:11px;">${esc(r.account?.accountNo)}</div></td>
+    <td>${esc(r.bankRef) || "—"}</td><td class="num">${money(r.brokerageCents, r.ccy)}</td><td>${esc(r.recordedBy?.name)}</td>
+    <td>${r.reversed ? statusPill("Cancelled") : statusPill("Posted")}</td></tr>`);
+  return `<div class="panel-sub">Money received from cedants. Each receipt is split pro rata across the closing slips and drafts a remittance to every reinsurer.</div>
+    ${held.length ? `<div class="toolbar">${held.map(([ccy, c]) => subBadge(`Taxes held for authorities: ${money(c, ccy)}`, "warn")).join(" ")}</div>` : ""}
+    ${table(["Receipt", "Document", "Cedant", "#Amount", "Received", "Into", "Bank ref", "#Brokerage", "Recorded by", "Status"], rows, "No receipts yet. Record one from an issued invoice's billing drawer.")}
+    ${paginationControls(page, { unit: "receipts", name: "finance" })}`;
+}
+
+function remittancesTab() {
+  const all = state.billing.remittances;
+  const shown = all.filter(REM_FILTERS[remFilter][1]);
+  const page = paginate(shown, pager.page);
+  const seg = `<div class="seg" id="rem-filter">${Object.entries(REM_FILTERS).map(([k, [l, f]]) => `<button class="${k === remFilter ? "active" : ""}" data-rf="${k}">${l}<span class="seg-badge">${all.filter(f).length}</span></button>`).join("")}</div>`;
+  const rows = page.items.map((m) => `<tr class="reg-tr" data-action="open-remittance" data-ref="${m.ref}" tabindex="0">
+    <td><strong>${m.ref}</strong></td><td>${esc(m.reinsurer)}</td><td class="mono">${m.closingSlipId}</td><td class="mono">${m.receiptRef}</td>
+    <td class="num">${money(m.cents, m.ccy)}</td><td>${m.payTo ? esc(m.payTo.bankName) : "<span class='muted'>—</span>"}</td>
+    <td>${m.paidDate || "—"}</td><td>${esc(m.bankRef) || "—"}</td><td>${statusPill(m.status)}</td></tr>`);
+  return `<div class="toolbar">${seg}</div>
+    ${table(["Remittance", "Reinsurer", "Closing slip", "Receipt", "#Amount", "Pay to", "Paid", "Bank ref", "Status"], rows, all.length ? "Nothing in this filter." : "No remittances yet. They are drafted when a cedant's payment is recorded.")}
+    ${paginationControls(page, { unit: "remittances", name: "finance" })}`;
 }
 
 function slipsTab() {
@@ -202,7 +245,7 @@ function techTab() {
     </div>`;
 }
 
-const BODY = { billing: billingTab, cedant: cedantTab, slips: slipsTab, accounts: accountsTab, tax: taxTab, tech: techTab };
+const BODY = { billing: billingTab, cedant: cedantTab, slips: slipsTab, receipts: receiptsTab, remittances: remittancesTab, accounts: accountsTab, tax: taxTab, tech: techTab };
 
 export const accountingView = {
   id: "accounting",
@@ -210,7 +253,7 @@ export const accountingView = {
   render: () => `<section class="view">
     <div class="view-head"><div><h1>Finance</h1><p>Premium billing, closing slips and technical accounts.</p></div></div>
     <div class="tabs" id="fin-tabs">${TABS.map(([k, l]) => {
-      const n = k === "billing" ? state.billing.batches.filter(BATCH_FILTERS.open[1]).length : 0;
+      const n = k === "billing" ? state.billing.batches.filter(BATCH_FILTERS.open[1]).length : k === "remittances" ? state.billing.remittances.filter(REM_FILTERS.open[1]).length : 0;
       return `<div class="tab${k === tab ? " active" : ""}" data-t="${k}">${l}${n ? ` <span class="seg-badge">${n}</span>` : ""}</div>`;
     }).join("")}</div>
     <div id="fin-body"></div>
@@ -220,6 +263,7 @@ export const accountingView = {
     const root = $("#view-root");
     onAction("#view-root", {
       "open-batch": ({ ref }) => openBillingDetail(ref),
+      "open-remittance": ({ ref }) => openRemittanceDetail(ref),
       "add-tax": () => openFormModal({ title: "Add tax rule", fields: taxFields(), submitLabel: "Add rule",
         validate: (v) => addTaxRuleDry(v), onSubmit: (v) => addTaxRule(v) }),
       "edit-tax": ({ id }) => { const r = state.billing.taxRules.find((x) => x.id === id); if (!r) return;
@@ -240,11 +284,16 @@ export const accountingView = {
       $$("#fin-tabs .tab").forEach((x) => x.classList.toggle("active", x === t));
       accountingView.refresh();
     }));
-    root.addEventListener("click", (e) => { const b = e.target.closest("#batch-filter button"); if (b) { batchFilter = b.dataset.bf; pager.reset(); accountingView.refresh(); } });
+    root.addEventListener("click", (e) => {
+      const b = e.target.closest("#batch-filter button"); if (b) { batchFilter = b.dataset.bf; pager.reset(); accountingView.refresh(); }
+      const r = e.target.closest("#rem-filter button"); if (r) { remFilter = r.dataset.rf; pager.reset(); accountingView.refresh(); }
+    });
     root.addEventListener("change", (e) => { if (e.target.id === "acc-select") { selectedId = e.target.value; paintTechnicalAccount(); } });
     root.addEventListener("keydown", (e) => {
-      const t = e.target.closest?.("[data-action='open-batch'][tabindex]");
-      if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openBillingDetail(t.dataset.ref); }
+      const t = e.target.closest?.("[data-action='open-batch'][tabindex], [data-action='open-remittance'][tabindex]");
+      if (!t || !(e.key === "Enter" || e.key === " ")) return;
+      e.preventDefault();
+      if (t.dataset.action === "open-remittance") openRemittanceDetail(t.dataset.ref); else openBillingDetail(t.dataset.ref);
     });
   },
 

@@ -201,6 +201,28 @@ recipient's registry details, are copied onto the document at issue. Invoices ra
 desk directly to reinsurers (`state.financeDocs`) stay readable as Legacy;
 `finance.service.js` is no longer called.
 
+`payments.service.js` is the only writer to `state.billing.receipts` and
+`state.billing.remittances`. `recordReceipt` takes money received against an
+issued invoice or debit note — in its currency, into a collection account,
+never more than is outstanding — and splits it with `allocateReceipt`
+(`domain/payments.js`): cumulatively, so each part-payment takes its share of
+"paid so far" and the last one lands every Closing Slip, the brokerage and
+the taxes held on their exact figures. Each share becomes a Draft remittance
+to that reinsurer. A remittance is approved by a second authorised person
+only when the reinsurer has an active account in that currency (copied onto
+the record at approval), then marked Paid with the date, the broker's
+remittance account and the bank reference. `reverseReceipt` cancels the
+unpaid remittances drafted from it and is refused once one is paid; an
+invoice with live receipts cannot be cancelled. When every invoice and debit
+note billed to a placement is paid, `setPremiumPaid` releases the claims
+credit-control hold. Remittances from treaty billing show in the agreement's
+Settlements tab, and manual settlements are refused for those accounts.
+Credit-note refunds to cedants are a later phase.
+
+Drawers bind their click handlers to their own `.modal-backdrop` element, not
+to the shared `#modal-root`: the element is replaced on every repaint and
+removed on close, so one drawer's handlers never fire in another.
+
 `intake.service.js` owns the broker intake queue. `createManualIntake` records
 a request that arrived by email, phone, WhatsApp or meeting; `createPortalIntake`
 is what the cedant portal's Submit a Risk now calls. `acceptIntake` freezes the

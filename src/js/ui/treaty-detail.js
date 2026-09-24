@@ -19,6 +19,9 @@ import { renderCalculator, mountCalculator } from "./treaty-calculators.js";
 import { openTreatyWizard } from "./treaty-wizard.js";
 import { openBillingDetail } from "./billing-detail.js";
 import { batchesForSource } from "../services/billing.service.js";
+import { remittancesForAgreement } from "../services/payments.service.js";
+import { openRemittanceDetail } from "./remittance-detail.js";
+import { fromCents } from "../domain/billing.js";
 import {
   AGREEMENT_TRANSITIONS, BORDEREAU_STATUSES, CESSION_STATUSES, ACCOUNT_STATUSES, SETTLEMENT_STATUSES, TREATY_CURRENCIES,
   activationChecklist, canActivate, expiryIndicator, nextTreatyAction, requiresDeclarations, acceptsTransactions,
@@ -28,6 +31,9 @@ import {
   activateAgreement, setAgreementStatus, addAgreementDocument, addEndorsement, DOCUMENT_TYPES,
   addPremiumBordereau, addClaimsBordereau, addCession, addTechnicalAccount, addSettlement, setRecordStatus, recordsFor, validateWorkstreamRecord,
 } from "../services/treaty.service.js";
+
+/** This drawer's own element. Listeners bound here die with it, so they never fire for another drawer. */
+const drawerRoot = () => document.querySelector("#modal-root > .modal-backdrop");
 
 export const DETAIL_TABS = [
   ["overview", "Overview"], ["structure", "Structure"], ["panel", "Panel"], ["bordereaux", "Bordereaux"], ["cessions", "Cessions"],
@@ -144,9 +150,15 @@ function accounts(a, recs) {
 }
 
 function settlements(a, recs) {
-  const add = acceptsTransactions(a) ? `<button class="btn primary" style="padding:5px 10px;" data-action="add-settlement">+ Raise settlement</button>` : "";
-  return `<div class="toolbar" style="justify-content:space-between;"><div class="panel-title" style="font-size:12.5px; margin:0;">Settlements</div>${add}</div>
-    ${table(["Reference", "Technical account", "Counterparty", "#Amount", "Due", "Payment status"], recs.settlements.map((s) => `<tr><td><strong>${s.ref}</strong></td><td>${esc(s.accountRef) || "—"}</td><td>${esc(s.counterparty)}</td><td class="num">${fmtFull(s.amount, s.ccy)}</td><td>${s.dueDate}</td><td>${statusPill(s.paymentStatus)}${mover("settlements", s.ref, s.paymentStatus, SETTLEMENT_STATUSES, a)}</td></tr>`), "No settlements raised for this agreement.")}`;
+  const add = acceptsTransactions(a) ? `<button class="btn primary" style="padding:5px 10px;" data-action="add-settlement">+ Raise manual settlement</button>` : "";
+  const rems = remittancesForAgreement(a.id);
+  const finance = rems.length ? `<div class="panel-title" style="font-size:12.5px; margin-top:16px;">Remittances from Finance</div>
+    ${table(["Remittance", "Technical account", "Reinsurer", "#Amount", "Paid", "Status"], rems.map((m) => `<tr class="reg-tr" data-action="open-remittance" data-ref="${m.ref}"><td><strong>${m.ref}</strong></td><td>${esc(m.sourceLabel.split(" technical account ")[1]?.split(" ·")[0] || "—")}</td><td>${esc(m.reinsurer)}</td><td class="num">${fmtFull(fromCents(m.cents), m.ccy)}</td><td>${m.paidDate || "—"}</td><td>${statusPill(m.status)}</td></tr>`), "")}
+    <div class="hint" style="margin-top:4px;">Drafted when the cedant pays a Finance invoice for this agreement, and approved and paid in Finance.</div>` : "";
+  return `<div class="toolbar" style="justify-content:space-between;"><div class="panel-title" style="font-size:12.5px; margin:0;">Manual settlements</div>${add}</div>
+    ${table(["Reference", "Technical account", "Counterparty", "#Amount", "Due", "Payment status"], recs.settlements.map((s) => `<tr><td><strong>${s.ref}</strong></td><td>${esc(s.accountRef) || "—"}</td><td>${esc(s.counterparty)}</td><td class="num">${fmtFull(s.amount, s.ccy)}</td><td>${s.dueDate}</td><td>${statusPill(s.paymentStatus)}${mover("settlements", s.ref, s.paymentStatus, SETTLEMENT_STATUSES, a)}</td></tr>`), "No manual settlements.")}
+    <div class="hint" style="margin-top:4px;">Technical accounts billed through Finance take no manual settlement.</div>
+    ${finance}`;
 }
 
 function documents(a) {
@@ -197,9 +209,10 @@ function recordForm(title, collection, fields, write) {
 }
 
 function wire() {
-  onAction("#modal-root", {
+  onAction(drawerRoot(), {
     "tab": ({ tab: t }) => { tab = t; repaint(); },
     "open-billing": ({ ref }) => { closeModal(); openBillingDetail(ref); },
+    "open-remittance": ({ ref }) => { const back = openId; const t = tab; closeModal(); openRemittanceDetail(ref, () => openAgreementDetail(back, t)); },
     "go-tab": ({ tab: t }) => { tab = t; repaint(); },
     "continue-setup": () => { const id = openId; closeModal(); openTreatyWizard((aid) => openAgreementDetail(aid, "overview"), { agreementId: id }); },
     "activate": () => { activateAgreement(openId); repaint(); },
@@ -232,7 +245,7 @@ function wire() {
       numField("claims", `Claims (${agreementCcy()})`, { half: true }), numField("tax", `Tax (${agreementCcy()})`, { half: true }),
     ], addTechnicalAccount),
     "add-settlement": () => recordForm("Raise settlement", "settlements", [
-      { name: "accountRef", label: "Technical account", type: "select", options: ["", ...recordsFor(openId).technicalAccounts.map((t) => t.ref)], half: true },
+      { name: "accountRef", label: "Technical account", type: "select", options: ["", ...recordsFor(openId).technicalAccounts.filter((t) => !batchesForSource("treaty", t.ref).some((b) => b.status !== "Cancelled")).map((t) => t.ref)], half: true },
       { name: "counterparty", label: "Counterparty", type: "select", options: [...(agreementById(openId)?.panel || []).map((p) => p.reinsurer), agreementById(openId)?.cedant], required: true, half: true },
       numField("amount", `Amount (${agreementCcy()}) — negative when due to the cedant`, { required: true, half: true }), { name: "dueDate", label: "Due date", type: "date", required: true, half: true },
     ], addSettlement),
@@ -249,7 +262,7 @@ function wire() {
       ], submitLabel: "Record", onSubmit: (v) => { addEndorsement(openId, v); reopen(); },
     }),
   });
-  $("#modal-root")?.addEventListener("change", (e) => {
+  drawerRoot()?.addEventListener("change", (e) => {
     const sel = e.target.closest("[data-move]");
     if (sel) { setRecordStatus(sel.dataset.move, sel.dataset.ref, sel.value); repaint(); }
   });

@@ -290,8 +290,15 @@ test("broker profile: legal name required, printed as From, frozen onto issued d
   billing.updateBrokerProfile({ postalCode: "10110" });
   assert.equal(invoice.from.postalCode, "12190", "issued document keeps its details");
   const html = documentHtml(batch, invoice);
-  const order = ["<h1>Invoice</h1>", "Invoice number", "Date issued", "Date due", ">From<", "Jl. Sudirman Kav. 52", "12190", "finance@mbrb.co.id", ">Bill to<", "<th>Description</th>", ">Tax<", ">Amount<", ">Total<", "Subtotal", "VAT / Tax", "Amount due"];
+  const order = ["<h1>Invoice</h1>", "Invoice number", "Date issued", "Date due", ">From<", "Jl. Sudirman Kav. 52", "12190", "finance@mbrb.co.id", ">Bill to<", "Payment to", "<th>Description</th>", ">Tax<", ">Amount<", ">Total<", "Subtotal", "VAT / Tax", "Amount due"];
   let at = -1;
   order.forEach((needle) => { const i = html.indexOf(needle, at + 1); assert.ok(i > at, `"${needle}" in order`); at = i; });
   assert.ok(!html.includes(">Discount<"), "discount row hidden when there is none");
+});
+
+test("From and Bill to sit side by side in one row", () => {
+  const html = documentHtml({ sourceLabel: "x", preparedBy: {}, approvedBy: {} }, { id: "INV-1", docType: "Invoice", issueDate: "2026-09-18", dueDate: "2026-10-18", ccy: "USD", counterparty: "Meridian Mutual Insurance", total: 100, lines: [{ kind: "premium", label: "Gross premium", cents: 100 }], from: { legalName: "Broker" }, billTo: { legalName: "Cedant" } });
+  const row = html.match(/<div class="info">([\s\S]*?)<\/div>\s*<div class="block pay">/);
+  assert.ok(row, "one .info row");
+  assert.ok(row[1].includes(">From<") && row[1].includes(">Bill to<"), "both blocks in the same row");
 });

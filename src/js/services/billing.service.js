@@ -242,6 +242,9 @@ export function markDocumentSent(ref, docId) {
 export function raiseCancellation(ref, reason) {
   const original = batchByRef(ref);
   if (!original || original.status !== "Issued" || original.sourceKind === "reversal") return null;
+  // Money already received has to be reversed first, or the cancellation
+  // would leave cash with no document behind it.
+  if (state.billing.receipts.some((r) => r.batchRef === ref && !r.reversed)) return null;
   if (state.billing.batches.some((b) => b.sourceKind === "reversal" && b.source.ref === ref && b.status !== "Cancelled")) return null;
   const neg = (lines) => lines.map((l) => ({ ...l, label: `Reversal: ${l.label}`, cents: -l.cents }));
   const cedant = original.documents[0];

@@ -78,6 +78,8 @@ export const state = {
    */
   billing: {
     batches: [], taxRules: [], brokerAccounts: [],
+    /** Money received from cedants, and remittances to reinsurers. services/payments.service.js. */
+    receipts: [], remittances: [],
     /** The broker's own details, printed on every finance document. Only the legal name is known up front. */
     brokerProfile: { legalName: BROKING_FIRM, address: "", postalCode: "", country: "", email: "", phone: "", taxId: "", history: [] },
   },
@@ -119,8 +121,10 @@ export const sequences = {
   program: 1008,
   intake: 1003,
   premiumBdx: 36, claimsBdx: 22, cession: 110, account: 15, settlement: 226,
-  billingBatch: 1, closingSlip: 1,
+  billingBatch: 1, closingSlip: 1, receipt: 1, remittance: 1,
 };
+export const nextReceiptRef = () => "RC-" + String(sequences.receipt++).padStart(4, "0");
+export const nextRemittanceRef = () => "RM-" + String(sequences.remittance++).padStart(4, "0");
 export const nextBillingBatchRef = () => "BB-" + String(sequences.billingBatch++).padStart(4, "0");
 export const nextClosingSlipNo = () => "CS-" + String(sequences.closingSlip++).padStart(4, "0");
 export const nextTreatyRef = (kind) => ({

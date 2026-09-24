@@ -17,6 +17,9 @@ import { icons } from "../../ui/icons.js";
 import { paginate, paginationControls, createPager } from "../../ui/pagination.js";
 import { openTreatyWizard } from "../../ui/treaty-wizard.js";
 import { openAgreementDetail } from "../../ui/treaty-detail.js";
+import { openRemittanceDetail } from "../../ui/remittance-detail.js";
+import { remittancesForAgreement } from "../../services/payments.service.js";
+import { fromCents } from "../../domain/billing.js";
 import {
   TREATY_TYPES, AGREEMENT_STATUSES, filterAgreements, expiryIndicator, panelTotal, structureSummary, accountNet, requiresDeclarations,
 } from "../../domain/treaty.js";
@@ -123,8 +126,12 @@ function workstreamBody() {
     }
     case "accounts": return selector() + tbl(["Reference", "Agreement", "Period", "#Premium", "#Commission", "#Claims", "#Tax", "#Net balance", "Ccy", "Status"],
       scope(t.technicalAccounts).map((x) => `<tr><td><strong>${x.ref}</strong></td><td>${agreementCell(x.agreementId).replace("__WS__", "accounts")}</td><td>${esc(x.period)}</td><td class="num">${fmtFull(x.premium, x.ccy)}</td><td class="num">${fmtFull(x.commission, x.ccy)}</td><td class="num">${fmtFull(x.claims, x.ccy)}</td><td class="num">${fmtFull(x.tax, x.ccy)}</td><td class="num"><strong>${fmtFull(accountNet(x), x.ccy)}</strong></td><td>${x.ccy}</td><td>${statusPill(x.status)}</td></tr>`), "No technical accounts.");
-    case "settlements": return selector() + tbl(["Reference", "Agreement", "Technical account", "Counterparty", "#Amount", "Ccy", "Due date", "Payment status"],
-      scope(t.settlements).map((s) => `<tr><td><strong>${s.ref}</strong></td><td>${agreementCell(s.agreementId).replace("__WS__", "settlements")}</td><td>${esc(s.accountRef) || "—"}</td><td>${esc(s.counterparty)}</td><td class="num">${fmtFull(s.amount, s.ccy)}</td><td>${s.ccy}</td><td>${s.dueDate}</td><td>${statusPill(s.paymentStatus)}</td></tr>`), "No settlements.");
+    case "settlements": {
+      const rems = A().flatMap((a) => remittancesForAgreement(a.id)).filter((m) => agreementFilter === "all" || m.agreementId === agreementFilter);
+      const manual = scope(t.settlements).map((s) => `<tr><td><strong>${s.ref}</strong></td><td>${agreementCell(s.agreementId).replace("__WS__", "settlements")}</td><td>${esc(s.accountRef) || "—"}</td><td>${esc(s.counterparty)}</td><td class="num">${fmtFull(s.amount, s.ccy)}</td><td>${s.ccy}</td><td>${s.dueDate}</td><td>${statusPill(s.paymentStatus)}</td></tr>`);
+      const finance = rems.map((m) => `<tr class="reg-tr" data-action="open-remittance" data-ref="${m.ref}"><td><strong>${m.ref}</strong> ${subBadge("Finance")}</td><td>${agreementCell(m.agreementId).replace("__WS__", "settlements")}</td><td>${esc(m.closingSlipId)}</td><td>${esc(m.reinsurer)}</td><td class="num">${fmtFull(fromCents(m.cents), m.ccy)}</td><td>${m.ccy}</td><td>${m.paidDate || "—"}</td><td>${statusPill(m.status)}</td></tr>`);
+      return selector() + tbl(["Reference", "Agreement", "Account / slip", "Counterparty", "#Amount", "Ccy", "Due / paid", "Status"], [...finance, ...manual], "No settlements.");
+    }
     default: return "";
   }
 }
@@ -148,6 +155,7 @@ export const treatyView = {
     onAction("#view-root", {
       "register": () => openTreatyWizard((id) => openAgreementDetail(id)),
       "open-agreement": ({ id, tab }) => openAgreementDetail(id, tab || "overview"),
+      "open-remittance": ({ ref }) => openRemittanceDetail(ref),
       "reset-filters": () => { filters = { q: "", cedant: "all", cls: "all", period: "all", status: "all", type: "all", reinsurer: "all", ccy: "all" }; pager.reset(); treatyView.refresh(); },
     });
     pager.wire("#view-root");

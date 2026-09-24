@@ -29,6 +29,9 @@ import {
 } from "../services/registry.service.js";
 import { stageOf } from "../domain/lifecycle.js";
 
+/** This drawer's own element. Listeners bound here die with it, so they never fire for another drawer. */
+const drawerRoot = () => document.querySelector("#modal-root > .modal-backdrop");
+
 let openName = null;
 let onOpenPlacement = null;
 
@@ -201,7 +204,7 @@ const bankFields = (b = {}) => [
 const readBank = (v) => ({ ...v, primary: v.primary === "Yes" });
 
 function wire() {
-  onAction("#modal-root", {
+  onAction(drawerRoot(), {
     "edit-profile": () => profileForm(counterpartyNamed(openName)),
     "add-pic": () => openFormModal({
       title: `Add PIC — ${openName}`, fields: picFields(), submitLabel: "Add PIC",

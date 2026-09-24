@@ -18,6 +18,9 @@ import {
 } from "../services/intake.service.js";
 import { paymentWarrantyLine } from "../domain/placement-terms.js";
 
+/** This drawer's own element. Listeners bound here die with it, so they never fire for another drawer. */
+const drawerRoot = () => document.querySelector("#modal-root > .modal-backdrop");
+
 let openId = null;
 let afterConvert = null;
 
@@ -133,7 +136,7 @@ function withNotes(title, submitLabel, then) {
 }
 
 function wire() {
-  onAction("#modal-root", {
+  onAction(drawerRoot(), {
     "start-review": () => { startReview(openId); repaint(); },
     "resume-review": () => withNotes("Revision received", "Resume review", (n) => resumeReview(openId, n)),
     "request-revision": () => withNotes("Request revision", "Record request", (n) => requestRevision(openId, n)),

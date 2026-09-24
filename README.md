@@ -156,7 +156,11 @@ payment warranty. Taxes and levies are custom rules the desk configures. The
 broker's own bank accounts are kept under Finance → Bank Accounts, and the
 primary collection account in the document's currency is printed on each
 invoice as its payment instructions.
-Receipts, remittances and aging come in later phases.
+Receipts from the cedant are recorded against each invoice, part-payments
+included; each one drafts remittances to the reinsurers pro rata, which a
+second authorised person approves before the transfer is recorded. Paying
+every invoice and debit note on a placement lifts the claims credit-control
+hold. Credit-note refunds and aging come in later phases.
 
 Every **Registry** entry opens to a drawer where the desk views or manages the
 company profile, the bank accounts settlement runs through, and the people in

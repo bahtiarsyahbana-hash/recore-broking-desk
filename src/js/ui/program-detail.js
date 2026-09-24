@@ -36,6 +36,9 @@ import {
   setDocumentDelivery, DELIVERY_STATUSES, setPaymentWarranty, recordEndorsement,
 } from "../services/placement.service.js";
 
+/** This drawer's own element. Listeners bound here die with it, so they never fire for another drawer. */
+const drawerRoot = () => document.querySelector("#modal-root > .modal-backdrop");
+
 let openId = null;
 
 /* ---------- 1. the journey rail ---------- */
@@ -250,6 +253,17 @@ function prompt({ title, subtitle, submitLabel, reference = false, notesRequired
 
 function responsePrompt(market, layer) {
   const p = programById(openId);
+  if (!market) {
+    // The next-action card names no market: take the first line still waiting
+    // on an answer — a query first, then anything not yet confirmed or declined.
+    const open = (s) => s !== "Confirmed" && s !== "Declined";
+    const lines = isLayered(p)
+      ? p.layers.flatMap((l, i) => (l.markets || []).map((mc) => ({ mc, layer: i })))
+      : (p.marketConfirmations || []).map((mc) => ({ mc, layer: undefined }));
+    const pick = lines.find((x) => x.mc.s === "Queried") || lines.find((x) => open(x.mc.s || "Sent"));
+    if (!pick) return;
+    market = pick.mc.m; layer = pick.layer;
+  }
   const mc = isLayered(p) ? p.layers[Number(layer)]?.markets.find((x) => x.m === market) : p.marketConfirmations.find((x) => x.m === market);
   if (!mc) return;
   const nextOptions = MARKET_RESPONSE_NEXT[mc.s || "Sent"] || [];
@@ -279,7 +293,7 @@ function wire() {
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); });
   });
 
-  onAction("#modal-root", {
+  onAction(drawerRoot(), {
     "start-renewal": () => { startRenewal(openId); repaint(); },
     "submit-approval": () => { submitForApproval(openId); repaint(); },
     "release-slip": () => { releaseSlip(openId); repaint(); },

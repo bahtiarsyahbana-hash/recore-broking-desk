@@ -29,7 +29,7 @@ const TONE = {
   // Treaty administration.
   "Draft Setup": "neutral", "Expiring": "warn", "Run-off": "info", "Closed": "neutral",
   "Posted": "good", "Declared": "info", "Pending": "warn", "Part paid": "warn", "Settled": "good",
-  "Cancelled": "bad",
+  "Cancelled": "bad", "Approved": "info", "Unpaid": "neutral",
   // Document delivery.
   "Issued": "info", "Delivered": "good", "Acknowledged": "good", "Filed": "neutral",
   // A counterparty nobody has onboarded is neither fine nor failing.
