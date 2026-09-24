@@ -21,7 +21,7 @@ export const brokerNav = [
   { view: "placements",  label: "Placements",    icon: icons.placements },
   { view: "treaty",      label: "Treaty Engine", icon: icons.treaty },
   { view: "claims",      label: "Claims",        icon: icons.claims },
-  { view: "accounting",  label: "Accounting",    icon: icons.accounting },
+  { view: "accounting",  label: "Finance",       icon: icons.accounting },
   { view: "reports",     label: "Reports",       icon: icons.reports },
   { section: "Registry" },
   { view: "reg-cedants",     label: "Cedants",             icon: icons.cedant },

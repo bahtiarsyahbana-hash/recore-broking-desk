@@ -71,6 +71,12 @@ export const state = {
    * operational workstreams that reference them. Mutated only through
    * services/treaty.service.js.
    */
+  /**
+   * Billing: batches of premium documents (one cedant document plus a Closing
+   * Slip per reinsurer) and the custom tax and levy rules applied to them.
+   * Mutated only through services/billing.service.js. Nothing is seeded.
+   */
+  billing: { batches: [], taxRules: [], brokerAccounts: [] },
   treaty: {
     agreements: seedAgreements.map((a) => JSON.parse(JSON.stringify(a))),
     premiumBordereaux: seedPremiumBdx.map((b) => ({ ...b })),
@@ -109,7 +115,10 @@ export const sequences = {
   program: 1008,
   intake: 1003,
   premiumBdx: 36, claimsBdx: 22, cession: 110, account: 15, settlement: 226,
+  billingBatch: 1, closingSlip: 1,
 };
+export const nextBillingBatchRef = () => "BB-" + String(sequences.billingBatch++).padStart(4, "0");
+export const nextClosingSlipNo = () => "CS-" + String(sequences.closingSlip++).padStart(4, "0");
 export const nextTreatyRef = (kind) => ({
   premiumBdx: () => "PB-" + String(sequences.premiumBdx++).padStart(4, "0"),
   claimsBdx: () => "CB-" + String(sequences.claimsBdx++).padStart(4, "0"),

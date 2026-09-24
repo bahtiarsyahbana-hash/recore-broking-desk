@@ -103,6 +103,19 @@ where the business is, and it is the layer worth unit-testing first.
   cession (only where the agreement requires declarations), technical account,
   settlement — each of which must reference an agreement that is not Closed.
   Calculations reuse `quota-share.js`, `surplus.js` and `xol.js`.
+- `billing.js` — premium billing. Money flows cedant → broker → reinsurers, so
+  one billing event produces a document to the cedant (Invoice; Debit or
+  Credit Note for an endorsement; Credit Note when a treaty account favours the
+  cedant) and a Closing Slip per reinsurer: its share of premium less
+  commission, less brokerage (deducted from the remittance and kept by the
+  broker), less any tax withheld. Amounts are integer cents split by largest
+  remainder, so the batch always balances: cedant total = remittances +
+  brokerage + taxes held. Custom tax and levy rules (nothing preset) choose
+  their document by who bears them. Due date = basis date + payment warranty:
+  the bound date for a placement, the endorsement date for an endorsement,
+  the Agreed date for a treaty technical account. `issueAuthority` is the
+  four-eyes rule: the preparer may not issue; the approver needs signing
+  authority; an administrator's self-approval is recorded as an override.
 - `portfolio.js` — book-level analytics: totals, premium by class, loss ratios,
   renewals due, and **concentration** — premium by cedant, exposure by
   reinsurer, and `concentration()`, which ranks any `{name: amount}` map into
@@ -159,6 +172,26 @@ Every write appends to the agreement's audit trail. Treaty Engine does not
 pass through Placement; `origin` is a nullable reference kept for future
 integration. The former calculator page lives on as `ui/treaty-calculators.js`,
 embedded under an agreement's Structure tab and prefilled from its terms.
+
+`billing.service.js` is the only writer to `state.billing`. Binding a
+placement, `recordEndorsement` on a bound placement, and a treaty technical
+account moving to Agreed each create a **Draft** batch and nothing more — no
+document number is consumed. The preparer sets commission and brokerage
+explicitly and submits; a different authorised person approves, which
+numbers every document in order (the cedant document, then each Closing Slip)
+and freezes them. A correction is `raiseCancellation`: a reversing batch with
+every line negated, issued under the same four-eyes, which marks the original
+Cancelled only when it issues. The broker's own bank accounts live in
+`state.billing.brokerAccounts` (Finance → Bank Accounts): one primary per
+currency, purpose Collection, Remittance or Both. The primary active
+collection account in a document's currency is copied onto every invoice and
+debit note at issue, so editing an account later never changes a document
+already sent; no other currency's account is ever substituted. A missing
+collection account shows on the checklist as a warning, not a block.
+Documents print through a hidden frame to the browser's print dialog
+(`ui/print-document.js`). Invoices raised by the earlier
+desk directly to reinsurers (`state.financeDocs`) stay readable as Legacy;
+`finance.service.js` is no longer called.
 
 `intake.service.js` owns the broker intake queue. `createManualIntake` records
 a request that arrived by email, phone, WhatsApp or meeting; `createPortalIntake`

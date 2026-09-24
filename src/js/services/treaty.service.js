@@ -10,6 +10,7 @@ import { state, agreementById, nextTreatyRef, currentUser } from "../core/store.
 import { todayISO } from "../core/config.js";
 import { emit, TOPICS } from "../core/events.js";
 import { stamp } from "../domain/authority.js";
+import { createTreatyDraft } from "./billing.service.js";
 import {
   validateBasics, validateStructure, validatePanel, canActivate, canTransitionAgreement, acceptsTransactions,
   validatePremiumBordereau, validateClaimsBordereau, validateCession, validateTechnicalAccount, validateSettlement,
@@ -238,6 +239,14 @@ export function setRecordStatus(collection, ref, status, notes) {
   if (record[field] === status) return record;
   record[field] = status;
   audit(a, `${ref} → ${status}`, notes);
+  // An Agreed technical account is where the payment warranty starts and
+  // billing is drafted — an invoice or credit note to the cedant and a
+  // Closing Slip per reinsurer, issued later under four-eyes.
+  if (collection === "technicalAccounts" && status === "Agreed") {
+    if (!record.agreedAt) record.agreedAt = todayISO();
+    const batch = createTreatyDraft(record);
+    if (batch) audit(a, "Billing drafted", `${batch.ref} for ${ref}`);
+  }
   publish({ id: a.id, action: collection });
   return record;
 }

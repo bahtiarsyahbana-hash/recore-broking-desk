@@ -17,6 +17,8 @@ import { openModal, updateModal, closeModal } from "./modal.js";
 import { openFormModal } from "./form-modal.js";
 import { renderCalculator, mountCalculator } from "./treaty-calculators.js";
 import { openTreatyWizard } from "./treaty-wizard.js";
+import { openBillingDetail } from "./billing-detail.js";
+import { batchesForSource } from "../services/billing.service.js";
 import {
   AGREEMENT_TRANSITIONS, BORDEREAU_STATUSES, CESSION_STATUSES, ACCOUNT_STATUSES, SETTLEMENT_STATUSES, TREATY_CURRENCIES,
   activationChecklist, canActivate, expiryIndicator, nextTreatyAction, requiresDeclarations, acceptsTransactions,
@@ -127,10 +129,17 @@ function cessions(a, recs) {
     ${table(["Reference", "Insured / risk", "Class", "#Sum insured", "#Retention", "#Ceded", "Effective", "Status"], recs.cessions.map((c) => `<tr><td><strong>${c.ref}</strong></td><td>${esc(c.insured)}</td><td>${esc(c.cls)}</td><td class="num">${fmtFull(c.sumInsured, a.ccy)}</td><td class="num">${fmtFull(c.retention, a.ccy)}</td><td class="num">${fmtFull(c.ceded, a.ccy)}</td><td>${c.effectiveDate}</td><td>${statusPill(c.status)}${mover("cessions", c.ref, c.status, CESSION_STATUSES, a)}</td></tr>`), "No cessions declared under this agreement.")}`;
 }
 
+/** The billing batch drafted for a technical account, if any. */
+function billingCell(t) {
+  const b = batchesForSource("treaty", t.ref).find((x) => x.status !== "Cancelled") || batchesForSource("treaty", t.ref)[0];
+  return b ? `<button class="btn ghost" style="padding:3px 8px; font-size:11px;" data-action="open-billing" data-ref="${b.ref}">${b.ref} · ${b.status}</button>` : '<span class="muted">—</span>';
+}
+
 function accounts(a, recs) {
   const add = acceptsTransactions(a) ? `<button class="btn primary" style="padding:5px 10px;" data-action="add-account">+ Draft technical account</button>` : "";
   return `<div class="toolbar" style="justify-content:space-between;"><div class="panel-title" style="font-size:12.5px; margin:0;">Technical accounts · ${a.reporting?.accountingFrequency || "frequency not set"}</div>${add}</div>
-    ${table(["Reference", "Period", "#Premium", "#Commission", "#Claims", "#Tax", "#Net balance", "Status"], recs.technicalAccounts.map((t) => `<tr><td><strong>${t.ref}</strong></td><td>${esc(t.period)}</td><td class="num">${fmtFull(t.premium, t.ccy)}</td><td class="num">${fmtFull(t.commission, t.ccy)}</td><td class="num">${fmtFull(t.claims, t.ccy)}</td><td class="num">${fmtFull(t.tax, t.ccy)}</td><td class="num"><strong>${fmtFull(accountNet(t), t.ccy)}</strong></td><td>${statusPill(t.status)}${mover("technicalAccounts", t.ref, t.status, ACCOUNT_STATUSES, a)}</td></tr>`), "No technical accounts for this agreement.")}
+    ${table(["Reference", "Period", "#Premium", "#Commission", "#Claims", "#Tax", "#Net balance", "Status", "Billing"], recs.technicalAccounts.map((t) => `<tr><td><strong>${t.ref}</strong></td><td>${esc(t.period)}</td><td class="num">${fmtFull(t.premium, t.ccy)}</td><td class="num">${fmtFull(t.commission, t.ccy)}</td><td class="num">${fmtFull(t.claims, t.ccy)}</td><td class="num">${fmtFull(t.tax, t.ccy)}</td><td class="num"><strong>${fmtFull(accountNet(t), t.ccy)}</strong></td><td>${statusPill(t.status)}${mover("technicalAccounts", t.ref, t.status, ACCOUNT_STATUSES, a)}</td><td>${billingCell(t)}</td></tr>`), "No technical accounts for this agreement.")}
+    <div class="hint" style="margin-top:4px;">Moving an account to Agreed drafts its billing in Finance: an invoice or credit note to the cedant and a closing slip per reinsurer, due ${a.reporting?.paymentWarrantyDays ? `${a.reporting.paymentWarrantyDays} days` : "after the payment warranty (not set on this agreement)"} from the agreed date.</div>
     <div class="hint" style="margin-top:8px;">Net balance = premium − commission − claims − tax. Positive is due to reinsurers; negative is due to the cedant.</div>`;
 }
 
@@ -190,6 +199,7 @@ function recordForm(title, collection, fields, write) {
 function wire() {
   onAction("#modal-root", {
     "tab": ({ tab: t }) => { tab = t; repaint(); },
+    "open-billing": ({ ref }) => { closeModal(); openBillingDetail(ref); },
     "go-tab": ({ tab: t }) => { tab = t; repaint(); },
     "continue-setup": () => { const id = openId; closeModal(); openTreatyWizard((aid) => openAgreementDetail(aid, "overview"), { agreementId: id }); },
     "activate": () => { activateAgreement(openId); repaint(); },

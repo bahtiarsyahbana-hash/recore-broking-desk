@@ -146,12 +146,24 @@ reinsurer and currency. An agreement activates only when its panel totals
 exactly 100%; a Closed agreement takes no new transactions; only agreements
 configured to require declarations accept individual cessions.
 
+**Finance** bills premium the way it flows: an invoice to the cedant and a
+**Closing Slip** to each reinsurer, with brokerage deducted from the
+remittance. Binding a placement, endorsing a bound placement, or agreeing a
+treaty technical account prepares a draft; a second authorised person
+approves and issues it, and every document is numbered at issue and frozen
+thereafter. Due dates run from the bound, endorsement or agreed date plus the
+payment warranty. Taxes and levies are custom rules the desk configures. The
+broker's own bank accounts are kept under Finance → Bank Accounts, and the
+primary collection account in the document's currency is printed on each
+invoice as its payment instructions.
+Receipts, remittances and aging come in later phases.
+
 Every **Registry** entry opens to a drawer where the desk views or manages the
 company profile, the bank accounts settlement runs through, and the people in
 charge grouped by the division they handle — placement, claims, technical
 accounting, compliance, management — with several people allowed per division.
 
-Tests: `npm test` runs the domain rules (lifecycle, panel capacity, intake, registry profile, treaty administration)
+Tests: `npm test` runs the domain rules (lifecycle, panel capacity, intake, registry profile, treaty administration, billing)
 with Node's built-in test runner; there are no dependencies.
 
 The dashboard shows **concentration** alongside the totals: premium by cedant

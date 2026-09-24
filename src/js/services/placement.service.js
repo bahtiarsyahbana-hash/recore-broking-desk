@@ -21,9 +21,8 @@ import { isValidPaymentWarranty } from "../domain/intake.js";
 import { stamp, usedOverride } from "../domain/authority.js";
 import { canReleaseSlip, readyToSubmit } from "../domain/slip-approval.js";
 import { isLayered, panelEntries, panelMarkets, canRecordResponse, backupSecured } from "../domain/panel.js";
-import { cessionRate } from "../domain/technical-account.js";
 import { structureLine, estimatedGrossPremium } from "../domain/placement-terms.js";
-import { raiseInvoice } from "./finance.service.js";
+import { createBindDraft, createEndorsementDraft } from "./billing.service.js";
 
 /* ---- paper trail ------------------------------------------------------ */
 
@@ -378,8 +377,10 @@ export function recordBindInstruction(id, { reference, notes } = {}) {
 /**
  * Execute the binding on the cedant's instruction. Binding freezes the agreed
  * terms, issues the RI slip to the cedant and a binding slip to each reinsurer,
- * opens the premium as unpaid and raises the market invoice. Anything that
- * changes after this is an amendment or endorsement, never an edit.
+ * opens the premium as unpaid and prepares the billing as a Draft batch — an
+ * invoice to the cedant and a Closing Slip per reinsurer, issued later by a
+ * second authorised person. Anything that changes after this is an
+ * endorsement, never an edit.
  */
 export function executeBinding(id, bindingInstructions) {
   const p = programById(id);
@@ -407,20 +408,42 @@ export function executeBinding(id, bindingInstructions) {
   }));
   file(p, { name: `RI slip — ${p.cedant}.pdf`, type: "RI Slip", version: p.slipVersion || 1, recipient: p.cedant, delivery: "Issued" });
 
-  raiseInvoice({
-    program: p.id,
-    counterparty: markets.join(", "),
-    amount: Math.round(p.premium * cessionRate(p.type)),
-    ccy: p.ccy,
-    coBroker: p.coBroker,
-  });
   record(p, "Bound and issued", `Terms frozen at slip v${p.slipVersion || 1}, proposal v${p.proposalVersion || 1}. RI slip and ${markets.length} binding slip(s) issued.`);
+  const batch = createBindDraft(p);
+  if (batch) record(p, "Billing drafted", `${batch.ref} — invoice and ${batch.computed.slips.length} closing slip(s) await approval`);
   emit(TOPICS.PROGRAMS, { id, action: "bound" });
   return p;
 }
 
 /** Kept for callers of the previous name. */
 export const approveAndBind = executeBinding;
+
+/**
+ * Record an endorsement on a bound placement and draft its billing. The bound
+ * terms stay frozen; the endorsement is its own dated record, and the premium
+ * change is billed from the endorsement date.
+ *
+ * @returns {{ program, endorsement, batch } | { errors }}
+ */
+export function recordEndorsement(id, { ref, date, premium, notes } = {}) {
+  const p = programById(id);
+  const errors = {};
+  if (!p || normaliseStatus(p.status) !== STATUS.BOUND) errors.id = "Only a bound placement can be endorsed.";
+  if (!date) errors.date = "Give the endorsement date.";
+  const amount = Number(premium);
+  if (premium === "" || premium == null || !Number.isFinite(amount) || amount === 0) errors.premium = "Enter the premium change — positive for additional, negative for return.";
+  if (Object.keys(errors).length) return { errors };
+  p.endorsements = p.endorsements || [];
+  const endorsement = { ref: String(ref || "").trim() || `E${p.endorsements.length + 1}`, date, premium: amount, notes: String(notes || "").trim(), by: actorName(), at: todayISO() };
+  if (p.endorsements.some((e) => e.ref === endorsement.ref)) return { errors: { ref: `Endorsement ${endorsement.ref} already exists on ${p.id}.` } };
+  p.endorsements.push(endorsement);
+  file(p, { name: `Endorsement ${endorsement.ref} — ${p.id}.pdf`, type: "Endorsement", recipient: p.cedant, delivery: "Filed" });
+  record(p, `Endorsement ${endorsement.ref} recorded`, `${amount > 0 ? "Additional" : "Return"} premium ${amount} ${p.ccy}, effective ${date}`);
+  const batch = createEndorsementDraft(p, endorsement);
+  if (batch) record(p, "Billing drafted", `${batch.ref} — ${batch.cedantDocType} awaits approval`);
+  emit(TOPICS.PROGRAMS, { id, action: "endorsed" });
+  return { program: p, endorsement, batch };
+}
 
 /* ---- creating and editing drafts -------------------------------------- */
 

@@ -18,6 +18,9 @@ import { icons } from "./icons.js";
 import { openModal, updateModal, closeModal } from "./modal.js";
 import { openFormModal } from "./form-modal.js";
 import { openWizard } from "./submission-wizard.js";
+import { openBillingDetail } from "./billing-detail.js";
+import { batchesForSource } from "../services/billing.service.js";
+import { fromCents } from "../domain/billing.js";
 import {
   LIFECYCLE_STEPS, stageOf, nextAction, bindChecklist, isPreMarket, isInMarket, normaliseStatus, STATUS,
 } from "../domain/lifecycle.js";
@@ -30,7 +33,7 @@ import {
   submitForApproval, releaseSlip, returnToDraft, reviseSlip,
   setSignedLine, removeMarketFromDraft, recordMarketResponse,
   recordProposalSent, recordCedantRevision, recordCedantApproval, recordBindInstruction,
-  setDocumentDelivery, DELIVERY_STATUSES, setPaymentWarranty,
+  setDocumentDelivery, DELIVERY_STATUSES, setPaymentWarranty, recordEndorsement,
 } from "../services/placement.service.js";
 
 let openId = null;
@@ -64,10 +67,16 @@ function nextActionCard(program) {
   const next = nextAction(program, { user: currentUser(), cedant: cedantNamed(program.cedant) });
   if (!next) {
     const bt = program.boundTerms;
+    const batches = batchesForSource(null, program.id);
+    const billingLine = batches.length
+      ? `<div class="bill-links">${batches.map((b) => `<button class="btn ghost" style="padding:3px 8px; font-size:11px;" data-action="open-billing" data-ref="${b.ref}">${b.ref} · ${b.cedantDocType} · ${fmtFull(fromCents(b.computed.cedant.total), b.ccy)} · ${b.status}</button>`).join("")}</div>`
+      : "";
     return `<div class="next-action done"><div class="next-action-body">
       <div class="next-action-kicker">${icons.check}Step ${LIFECYCLE_STEPS.length} of ${LIFECYCLE_STEPS.length} · bound issued</div>
       <h4>Bound${program.boundAt ? ` on ${program.boundAt}` : ""}</h4>
-      <p>${bt ? `Terms frozen at slip v${bt.slipVersion}, proposal v${bt.proposalVersion}. Any change from here is an amendment or endorsement, not an edit.` : "Bound before versioned terms were kept on the record."} Instructions on file: ${program.bindingInstructions || "none recorded"}. The premium invoice has been raised to the panel; this placement re-opens for renewal 60 days before ${program.expiry}.</p>
+      <p>${bt ? `Terms frozen at slip v${bt.slipVersion}, proposal v${bt.proposalVersion}. Any change from here is an endorsement, not an edit.` : "Bound before versioned terms were kept on the record."} Instructions on file: ${program.bindingInstructions || "none recorded"}. ${batches.length ? "Billing is prepared in Finance and issued under four-eyes." : "Billed before invoices went through Finance."} This placement re-opens for renewal 60 days before ${program.expiry}.</p>
+      ${billingLine}
+      <div class="next-action-actions"><button class="btn next-action-secondary" data-action="endorse">Raise endorsement invoice</button></div>
     </div></div>`;
   }
   const isDraft = normaliseStatus(program.status) === STATUS.DRAFT;
@@ -310,6 +319,32 @@ function wire() {
     "cedant-approved": () => prompt({ title: "Record cedant approval", subtitle: "Approval of terms only — not an instruction to bind", submitLabel: "Record approval" }, ({ notes }) => recordCedantApproval(openId, notes)),
     "bind-instructed": () => prompt({ title: "Record instruction to bind", subtitle: "The cedant's explicit instruction, with its reference", submitLabel: "Record instruction", reference: true }, (v) => recordBindInstruction(openId, v)),
     "bind": () => { executeBinding(openId, $("#detail-instructions")?.value); repaint(); },
+    "open-billing": ({ ref }) => { closeModal(); openBillingDetail(ref); },
+    "endorse": () => {
+      const p = programById(openId);
+      const id = openId;
+      openFormModal({
+        title: `Raise endorsement invoice — ${p.id}`,
+        subtitle: `Bound terms stay frozen. The premium change is billed from the endorsement date + ${p.terms?.paymentWarrantyDays ? `${p.terms.paymentWarrantyDays} days` : "the payment warranty chosen on the draft"}.`,
+        fields: [
+          { name: "ref", label: "Endorsement reference", type: "text", placeholder: `E${(p.endorsements?.length || 0) + 1}`, half: true },
+          { name: "date", label: "Endorsement date", type: "date", required: true, half: true },
+          { name: "premium", label: `Premium change (${p.ccy})`, type: "number", required: true, hint: "Positive for additional premium (debit note), negative for return premium (credit note)." },
+          { name: "notes", label: "What changed", type: "textarea", rows: 2 },
+        ],
+        submitLabel: "Record and draft billing",
+        validate: (v) => {
+          const e = {};
+          if (!(Number(v.premium) !== 0 && Number.isFinite(Number(v.premium)))) e.premium = "Enter a non-zero premium change.";
+          if (v.ref && (p.endorsements || []).some((x) => x.ref === v.ref.trim())) e.ref = `Endorsement ${v.ref} already exists.`;
+          return e;
+        },
+        onSubmit: (v) => {
+          const res = recordEndorsement(id, v);
+          if (res.batch) openBillingDetail(res.batch.ref); else openProgramDetail(id);
+        },
+      });
+    },
   });
 }
 
