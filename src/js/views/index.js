@@ -8,7 +8,6 @@ import { dashboardView } from "./broker/dashboard.view.js";
 import { placementsView } from "./broker/placements.view.js";
 import { intakeView } from "./broker/intake.view.js";
 import { treatyView } from "./broker/treaty.view.js";
-import { bordereauxView } from "./broker/bordereaux.view.js";
 import { claimsView } from "./broker/claims.view.js";
 import { accountingView } from "./broker/accounting.view.js";
 import { reportsView } from "./broker/reports.view.js";
@@ -24,7 +23,6 @@ export const allViews = [
   intakeView,
   placementsView,
   treatyView,
-  bordereauxView,
   claimsView,
   accountingView,
   reportsView,

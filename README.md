@@ -74,7 +74,7 @@ src/
     services/             the only writers to state; they publish what changed
     ui/                   badges, charts, icons, modal host, wizard, detail drawer
     views/
-      broker/             dashboard, placements, treaty, bordereaux, claims,
+      broker/             dashboard, placements, treaty, claims,
                           accounting, reports, and the five registry pages
       cedant/             programs, submit, bordereau, statement
 scripts/

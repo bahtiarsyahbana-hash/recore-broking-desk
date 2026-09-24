@@ -20,7 +20,6 @@ export const brokerNav = [
   { view: "intake",      label: "Intake",        icon: icons.inbox },
   { view: "placements",  label: "Placements",    icon: icons.placements },
   { view: "treaty",      label: "Treaty Engine", icon: icons.treaty },
-  { view: "bordereaux",  label: "Bordereaux",    icon: icons.bordereaux },
   { view: "claims",      label: "Claims",        icon: icons.claims },
   { view: "accounting",  label: "Accounting",    icon: icons.accounting },
   { view: "reports",     label: "Reports",       icon: icons.reports },
