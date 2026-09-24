@@ -3,11 +3,10 @@
  * Closing Slip rendered as a standalone page and sent to the browser's own
  * print dialog, which also saves it as PDF. No library, no server.
  */
-import { counterpartyNamed } from "../core/store.js";
-import { BROKING_FIRM } from "../core/config.js";
+import { state, counterpartyNamed } from "../core/store.js";
 import { brandMark } from "./brand.js";
 import { picsOf, bankAccountsOf, maskAccount } from "../domain/counterparty-profile.js";
-import { fromCents, formatShare } from "../domain/billing.js";
+import { fromCents, formatShare, invoiceTable } from "../domain/billing.js";
 
 const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const money = (cents, ccy) => `${ccy} ${fromCents(cents).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -18,69 +17,105 @@ function financeContact(entry) {
   return pics.find((p) => p.division === "Technical Accounting / Finance") || pics.find((p) => p.primary) || pics[0] || null;
 }
 
-export function documentHtml(batch, doc) {
+/** Broker details: the copy taken at issue, else the live profile (drafts never print). */
+function fromBlock(doc) {
+  if (doc.from) return doc.from;
+  const p = state.billing.brokerProfile;
+  return { legalName: p.legalName, address: p.address, postalCode: p.postalCode, country: p.country, email: p.email };
+}
+
+/** Recipient details: the copy taken at issue, else the registry record now. */
+function toBlock(doc) {
+  if (doc.billTo) return doc.billTo;
   const c = counterpartyNamed(doc.counterparty) || { name: doc.counterparty };
   const pic = financeContact(c);
+  return { legalName: c.name, address: c.address || "", postalCode: c.postalCode || "", country: c.country || "", email: pic?.email || "", attention: pic?.name || "" };
+}
+
+/** Legal name, full address with postal code, email — the same shape on both sides. */
+const party = (p) => `<p class="strong">${esc(p.legalName)}</p>
+  ${p.address ? `<p>${esc(p.address).replace(/\n/g, "<br>")}</p>` : ""}
+  ${p.postalCode || p.country ? `<p>${[p.postalCode, p.country].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+  ${p.email ? `<p>${esc(p.email)}</p>` : ""}
+  ${p.attention ? `<p class="muted">Attn: ${esc(p.attention)}</p>` : ""}`;
+
+export function documentHtml(batch, doc) {
   const isSlip = doc.docType === "Closing Slip";
+  const from = fromBlock(doc);
+  const to = toBlock(doc);
+  const t = invoiceTable(doc.lines);
+  const m = (cents) => money(cents, doc.ccy);
+
+  const c = counterpartyNamed(doc.counterparty) || {};
   const bank = isSlip ? bankAccountsOf(c)[0] : null;
-  const rows = doc.lines.map((l) => `<tr><td>${esc(l.label)}</td><td class="n">${money(l.cents, doc.ccy)}</td></tr>`).join("");
   const payment = isSlip
-    ? (bank ? `We will remit the net amount to ${esc(bank.bankName)} · ${esc(bank.accountName)} · A/C ${esc(maskAccount(bank.accountNo || bank.iban))}${bank.swift ? ` · ${esc(bank.swift)}` : ""}, on receipt of the cedant's premium.`
-      : "No bank account is on file for this reinsurer. Remittance cannot be made until one is recorded.")
-    : doc.total <= 0
-      ? "This amount is due to you. It will be settled against your account or paid to the bank account you have given us."
-      : doc.payTo
-        ? `Please pay ${esc(money(doc.total, doc.ccy))} by ${esc(doc.dueDate || "the due date")} to <strong>${esc(doc.payTo.bankName)}</strong> · ${esc(doc.payTo.accountName)} · A/C ${esc(doc.payTo.accountNo || "—")}${doc.payTo.iban ? ` · IBAN ${esc(doc.payTo.iban)}` : ""}${doc.payTo.swift ? ` · SWIFT ${esc(doc.payTo.swift)}` : ""}${doc.payTo.branch ? ` · ${esc(doc.payTo.branch)}` : ""}, quoting ${esc(doc.id)}.`
-        : `No collection account in ${esc(doc.ccy)} was on file when this document was issued. Contact ${esc(BROKING_FIRM)} for payment instructions.`;
+    ? (bank ? `${esc(bank.bankName)} · ${esc(bank.accountName)} · A/C ${esc(maskAccount(bank.accountNo || bank.iban))}${bank.swift ? ` · ${esc(bank.swift)}` : ""}` : "No bank account on file for this reinsurer.")
+    : doc.total <= 0 ? "Settled against your account or paid to the bank account you give us."
+      : doc.payTo ? `${esc(doc.payTo.bankName)} · ${esc(doc.payTo.accountName)} · A/C ${esc(doc.payTo.accountNo || "—")}${doc.payTo.iban ? ` · IBAN ${esc(doc.payTo.iban)}` : ""}${doc.payTo.swift ? ` · SWIFT ${esc(doc.payTo.swift)}` : ""}`
+        : `No collection account in ${esc(doc.ccy)} was on file at issue. Contact us for payment instructions.`;
+
+  const rows = t.rows.map((r, i) => `<tr>
+      <td>${esc(r.description)}${i === 0 ? `<div class="muted">${esc(batch.sourceLabel)}${isSlip ? ` · ${esc(formatShare(doc.share))} share` : ""}</div>` : ""}${r.taxes.length ? `<div class="muted">${r.taxes.map(esc).join(" · ")}</div>` : ""}</td>
+      <td class="n">${r.tax ? m(r.tax) : "—"}</td>
+      <td class="n">${r.kind === "tax-row" ? "—" : m(r.amount)}</td>
+      <td class="n">${m(r.total)}</td></tr>`).join("");
+
+  const dueLabel = isSlip ? "Net payable" : doc.total < 0 ? "Amount credited" : "Amount due";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(doc.id)} · ${esc(doc.docType)}</title>
 <style>
-  :root{ --ink:#001233; --soft:#616c80; --line:#e2e2e2; --tint:#f2f2f2; --accent:#0a369d; }
-  *{ box-sizing:border-box; } body{ margin:0; font:13px/1.45 "IBM Plex Sans",system-ui,sans-serif; color:var(--ink); background:#fff; }
-  .page{ max-width:780px; margin:32px auto; padding:0 28px; }
-  header{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding-bottom:18px; border-bottom:2px solid var(--ink); }
-  .brand{ display:flex; gap:12px; align-items:center; } .brand svg{ width:44px; height:44px; color:var(--ink); }
-  .firm{ font:600 18px Georgia,serif; } .sub{ font-size:11px; color:var(--soft); text-transform:uppercase; letter-spacing:.04em; }
-  h1{ font:600 22px Georgia,serif; margin:0; text-align:right; } .no{ text-align:right; font-family:ui-monospace,monospace; font-size:13px; margin-top:4px; }
-  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:22px 0; }
-  .box h3{ margin:0 0 6px; font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--soft); }
-  .box p{ margin:0; } dl{ display:grid; grid-template-columns:auto 1fr; gap:4px 14px; margin:0; } dt{ color:var(--soft); } dd{ margin:0; font-family:ui-monospace,monospace; }
-  table{ width:100%; border-collapse:collapse; margin-top:6px; } th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--soft); border-bottom:1px solid var(--line); padding:6px 0; }
-  td{ padding:8px 0; border-bottom:1px solid var(--line); } .n{ text-align:right; font-family:ui-monospace,monospace; white-space:nowrap; }
-  tfoot td{ font-weight:700; border-top:2px solid var(--ink); border-bottom:none; font-size:14px; }
-  .note{ margin-top:22px; padding:12px 14px; background:var(--tint); border-radius:8px; font-size:12px; }
-  footer{ margin-top:28px; font-size:11px; color:var(--soft); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .actions{ text-align:right; margin:16px auto 0; max-width:780px; padding:0 28px; }
-  .actions button{ font:600 12.5px system-ui; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color:#111; background:#fff; }
+  .page{ max-width:760px; margin:32px auto; padding:0 28px; }
+  .top{ display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:28px; }
+  h1{ margin:0; font-size:28px; font-weight:700; }
+  .brand{ display:flex; align-items:center; gap:10px; font-weight:600; font-size:15px; text-align:right; }
+  .brand svg{ width:36px; height:36px; color:#111; flex:none; }
+  .info{ display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:28px; }
+  .block{ margin-bottom:18px; } .block:last-child{ margin-bottom:0; }
+  .label{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#666; margin-bottom:4px; }
+  .block p{ margin:0; } .strong{ font-weight:600; } .muted{ color:#666; font-size:11.5px; }
+  dl{ display:grid; grid-template-columns:auto 1fr; gap:2px 14px; margin:0; } dt{ color:#666; } dd{ margin:0; }
+  table{ width:100%; border-collapse:collapse; }
+  th{ text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#666; padding:8px 0; border-bottom:1px solid #111; }
+  td{ padding:9px 0; border-bottom:1px solid #e5e5e5; vertical-align:top; }
+  th.n, td.n{ text-align:right; white-space:nowrap; padding-left:16px; font-variant-numeric:tabular-nums; }
+  .totals{ margin:18px 0 0 auto; width:300px; }
+  .totals div{ display:flex; justify-content:space-between; padding:4px 0; font-variant-numeric:tabular-nums; }
+  .totals .due{ margin-top:8px; padding-top:10px; border-top:2px solid #111; font-size:20px; font-weight:700; }
+  .actions{ max-width:760px; margin:16px auto 0; padding:0 28px; text-align:right; }
+  .actions button{ font:600 12.5px system-ui; padding:8px 14px; border-radius:6px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; }
   @media print{ .actions{ display:none; } .page{ margin:0 auto; } }
 </style></head><body>
 <div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div>
 <div class="page">
-  <header>
-    <div class="brand">${brandMark("pd-")}<div><div class="firm">${esc(BROKING_FIRM)}</div><div class="sub">Reinsurance broker</div></div></div>
-    <div><h1>${esc(doc.docType)}</h1><div class="no">${esc(doc.id)}</div></div>
-  </header>
-  <div class="grid">
-    <div class="box"><h3>${isSlip ? "Reinsurer" : "Bill to"}</h3>
-      <p><strong>${esc(c.name)}</strong></p>
-      ${c.address ? `<p>${esc(c.address)}</p>` : ""}${c.country ? `<p>${esc(c.country)}</p>` : ""}
-      ${pic ? `<p style="margin-top:6px;">Attn: ${esc(pic.name)}${pic.email ? ` · ${esc(pic.email)}` : ""}</p>` : ""}
-    </div>
-    <div class="box"><h3>Details</h3><dl>
-      <dt>Issue date</dt><dd>${esc(doc.issueDate)}</dd>
-      ${doc.dueDate ? `<dt>Due date</dt><dd>${esc(doc.dueDate)}</dd>` : ""}
-      ${batch.paymentWarrantyDays ? `<dt>Payment warranty</dt><dd>${esc(batch.paymentWarrantyDays)} days from ${esc(batch.basisDate)}</dd>` : ""}
-      <dt>Reference</dt><dd>${esc(batch.sourceLabel)}</dd>
-      <dt>Cedant</dt><dd>${esc(batch.cedant)}</dd>
-      ${isSlip ? `<dt>Share</dt><dd>${esc(formatShare(doc.share))}</dd>` : ""}
-      <dt>Currency</dt><dd>${esc(doc.ccy)}</dd>
-    </dl></div>
+  <div class="top">
+    <h1>${esc(doc.docType)}</h1>
+    <div class="brand">${brandMark("pd-")}<span>${esc(from.legalName)}</span></div>
   </div>
-  <table><thead><tr><th>Description</th><th class="n">Amount</th></tr></thead>
+  <div class="info">
+    <div>
+      <div class="block"><div class="label">Information</div><dl>
+        <dt>${esc(doc.docType)} number</dt><dd>${esc(doc.id)}</dd>
+        <dt>Date issued</dt><dd>${esc(doc.issueDate)}</dd>
+        <dt>Date due</dt><dd>${esc(doc.dueDate || "—")}</dd>
+      </dl></div>
+      <div class="block"><div class="label">From</div>${party(from)}</div>
+      <div class="block"><div class="label">${isSlip ? "Remit to" : "Payment to"}</div><p>${payment}</p></div>
+    </div>
+    <div>
+      <div class="block"><div class="label">${isSlip ? "Payable to" : "Bill to"}</div>${party(to)}</div>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Description</th><th class="n">Tax</th><th class="n">Amount</th><th class="n">Total</th></tr></thead>
     <tbody>${rows}</tbody>
-    <tfoot><tr><td>${isSlip ? "Net due to reinsurer" : doc.total < 0 ? "Total due to you" : "Total due"}</td><td class="n">${money(doc.total, doc.ccy)}</td></tr></tfoot>
   </table>
-  <div class="note">${payment}</div>
-  <footer><span>Prepared by ${esc(batch.preparedBy?.name)} · approved by ${esc(batch.approvedBy?.name)}${batch.overrideUsed ? " (administrator override)" : ""}</span><span>Batch ${esc(batch.ref)}</span></footer>
+  <div class="totals">
+    <div><span>Subtotal</span><span>${m(t.subtotal)}</span></div>
+    ${t.discount ? `<div><span>Discount</span><span>${m(t.discount)}</span></div>` : ""}
+    <div><span>VAT / Tax</span><span>${m(t.tax)}</span></div>
+    <div class="due"><span>${dueLabel}</span><span>${m(t.amountDue)}</span></div>
+  </div>
 </div></body></html>`;
 }
 

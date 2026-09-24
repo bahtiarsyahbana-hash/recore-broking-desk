@@ -23,15 +23,16 @@ import { openFormModal } from "../../ui/form-modal.js";
 import { openBillingDetail } from "../../ui/billing-detail.js";
 import {
   issuedDocuments, addTaxRule, updateTaxRule, removeTaxRule, addBrokerAccount, updateBrokerAccount, removeBrokerAccount,
+  updateBrokerProfile,
 } from "../../services/billing.service.js";
 import {
   fromCents, TAX_BASES, TAX_BEARERS, TAX_APPLIES, TAX_JURISDICTION_OF, SOURCE_KINDS, ACCOUNT_PURPOSES,
-  validateTaxRule, validateBrokerAccount,
+  validateTaxRule, validateBrokerAccount, validateBrokerProfile, brokerProfileGaps,
 } from "../../domain/billing.js";
 import { SETTLEMENT_CURRENCIES } from "./registry-fields.js";
 import { BROKING_FIRM } from "../../core/config.js";
 
-const TABS = [["billing", "Billing Queue"], ["cedant", "Invoices & Notes"], ["slips", "Closing Slips"], ["accounts", "Bank Accounts"], ["tax", "Tax Rules"], ["tech", "Technical Accounts"]];
+const TABS = [["billing", "Billing Queue"], ["cedant", "Invoices & Notes"], ["slips", "Closing Slips"], ["accounts", "Broker Profile"], ["tax", "Tax Rules"], ["tech", "Technical Accounts"]];
 const BATCH_FILTERS = { open: ["Open", (b) => b.status === "Draft" || b.status === "Pending Approval"], issued: ["Issued", (b) => b.status === "Issued"], cancelled: ["Cancelled", (b) => b.status === "Cancelled"], all: ["All", () => true] };
 
 let tab = "billing";
@@ -88,7 +89,31 @@ function slipsTab() {
     ${paginationControls(page, { unit: "closing slips", name: "finance" })}`;
 }
 
-/* ---------- the broker's bank accounts ---------- */
+/* ---------- the broker's profile and bank accounts ---------- */
+
+const PROFILE_LABELS = [["legalName", "Legal name"], ["address", "Address"], ["postalCode", "Postal code"], ["country", "Country"], ["email", "Email"], ["phone", "Phone"], ["taxId", "Tax ID"]];
+
+function profileCard() {
+  const p = state.billing.brokerProfile;
+  const gaps = brokerProfileGaps(p);
+  return `<div class="card" style="margin-bottom:16px;">
+    <div class="toolbar" style="justify-content:space-between; margin-bottom:8px;">
+      <div><div class="panel-title">Company details</div><div class="panel-sub" style="margin:0;">Printed as "From" on every invoice, note and closing slip. Issued documents keep the details they were issued with.</div></div>
+      <button class="btn" data-action="edit-profile">Edit details</button></div>
+    ${gaps.length ? `<div class="banner warn">${icons.info}Missing on documents: ${gaps.map((g) => PROFILE_LABELS.find(([k]) => k === g)[1].toLowerCase()).join(", ")}.</div>` : ""}
+    ${PROFILE_LABELS.map(([k, label]) => `<div class="confirm-row"><span>${label}</span><span>${p[k] ? esc(p[k]).replace(/\n/g, "<br>") : "<span class='muted'>Not set</span>"}</span></div>`).join("")}
+  </div>`;
+}
+
+const profileFields = (p) => [
+  { name: "legalName", label: "Legal name", type: "text", required: true, value: p.legalName || "" },
+  { name: "address", label: "Address", type: "textarea", rows: 2, value: p.address || "", placeholder: "Street, building, city" },
+  { name: "postalCode", label: "Postal code", type: "text", value: p.postalCode || "", half: true },
+  { name: "country", label: "Country", type: "text", value: p.country || "", half: true },
+  { name: "email", label: "Email", type: "email", value: p.email || "", half: true, placeholder: "finance@broker.com" },
+  { name: "phone", label: "Phone", type: "tel", value: p.phone || "", half: true },
+  { name: "taxId", label: "Tax ID", type: "text", value: p.taxId || "", placeholder: "e.g. NPWP" },
+];
 
 function accountsTab() {
   const accounts = state.billing.brokerAccounts;
@@ -105,7 +130,7 @@ function accountsTab() {
     <td>${a.primary ? subBadge("Primary", "good") : ""}</td>
     <td>${statusPill(a.active === false ? "Draft" : "Active")}</td>
     <td class="wrow-actions"><button class="btn ghost" style="padding:3px 8px; font-size:11px;" data-action="edit-account" data-id="${a.id}">Edit</button><button class="btn ghost line-remove" data-action="remove-account" data-id="${a.id}" title="Remove">✕</button></td></tr>`);
-  return `<div class="toolbar" style="justify-content:space-between;">
+  return `${profileCard()}<div class="panel-title">Bank accounts</div><div class="toolbar" style="justify-content:space-between;">
       <div class="panel-sub" style="margin:0;">${esc(BROKING_FIRM)}'s own accounts. The primary collection account in a document's currency is printed on every invoice and debit note.</div>
       <button class="btn primary" data-action="add-account">${icons.plus}Add bank account</button></div>
     ${coverage ? `<div class="toolbar">${coverage}</div>` : ""}
@@ -206,6 +231,8 @@ export const accountingView = {
         openFormModal({ title: `Edit ${a.bankName} · ${a.ccy}`, subtitle: "Issued documents keep the account they were issued with.", fields: accountFields(a), submitLabel: "Save",
           validate: (v) => validateBrokerAccount(v), onSubmit: (v) => updateBrokerAccount(id, v) }); },
       "remove-account": ({ id }) => removeBrokerAccount(id),
+      "edit-profile": () => openFormModal({ title: "Company details", subtitle: "Printed on every finance document", fields: profileFields(state.billing.brokerProfile), submitLabel: "Save",
+        validate: (v) => validateBrokerProfile(v), onSubmit: (v) => updateBrokerProfile(v) }),
     });
     pager.wire("#view-root");
     $$("#fin-tabs .tab").forEach((t) => t.addEventListener("click", () => {

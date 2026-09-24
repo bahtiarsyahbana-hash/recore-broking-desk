@@ -15,10 +15,11 @@ import { todayISO } from "../core/config.js";
 import { emit, TOPICS } from "../core/events.js";
 import { stamp } from "../domain/authority.js";
 import { isValidPaymentWarranty } from "../domain/intake.js";
+import { picsOf } from "../domain/counterparty-profile.js";
 import {
   computeBilling, placementWeights, cedantDocType, dueDate, issueAuthority,
   canSubmitBatch, canIssueBatch, validateTaxRule, fromCents,
-  validateBrokerAccount, collectionAccountFor, cedantPays,
+  validateBrokerAccount, collectionAccountFor, cedantPays, validateBrokerProfile,
 } from "../domain/billing.js";
 
 const actor = () => currentUser()?.name || "Desk";
@@ -63,6 +64,20 @@ function recompute(batch) {
   batch.dueDate = dueDate(batch.basisDate, batch.paymentWarrantyDays);
   batch.payTo = payToFor(batch);
   return batch;
+}
+
+/** The broker's details as they stood when a document was issued. */
+function brokerSnapshot() {
+  const p = state.billing.brokerProfile;
+  return { legalName: p.legalName, address: p.address, postalCode: p.postalCode, country: p.country, email: p.email, phone: p.phone, taxId: p.taxId };
+}
+
+/** The recipient's details from the registry, in the same shape as the broker's. */
+function counterpartySnapshot(name) {
+  const c = counterpartyNamed(name) || { name };
+  const pics = picsOf(c);
+  const finance = pics.find((x) => x.division === "Technical Accounting / Finance") || pics.find((x) => x.primary) || pics[0];
+  return { legalName: c.name, address: c.address || "", postalCode: c.postalCode || "", country: c.country || "", email: finance?.email || c.contactEmail || "", attention: finance?.name || "" };
 }
 
 /** A copy of the collection account the cedant should pay into, or null. */
@@ -189,7 +204,7 @@ export function issueBatch(ref) {
   b.documents = [
     { id: numberFor(b.cedantDocType), docType: b.cedantDocType, role: "Cedant", counterparty: b.cedant, lines: c.cedant.lines, total: c.cedant.total, delivery: "Issued", sentAt: null, payTo: b.payTo ? { ...b.payTo } : null },
     ...c.slips.map((s) => ({ id: nextClosingSlipNo(), docType: "Closing Slip", role: "Reinsurer", counterparty: s.reinsurer, share: s.weight, lines: s.lines, total: s.total, delivery: "Issued", sentAt: null })),
-  ].map((d) => ({ ...d, issueDate: today, dueDate: b.dueDate, ccy: b.ccy }));
+  ].map((d) => ({ ...d, issueDate: today, dueDate: b.dueDate, ccy: b.ccy, from: brokerSnapshot(), billTo: counterpartySnapshot(d.counterparty) }));
   b.status = "Issued";
   b.issuedAt = today;
   b.approvedBy = stamp(user);
@@ -287,6 +302,27 @@ export function removeTaxRule(id) {
   state.billing.batches.forEach(recompute);
   publish({ action: "tax-rule" });
   return true;
+}
+
+/* ---- the broker's company profile -------------------------------------------------------- */
+
+const PROFILE_FIELDS = ["legalName", "address", "postalCode", "country", "email", "phone", "taxId"];
+
+/** Update the broker's own details. Every change is recorded. */
+export function updateBrokerProfile(patch = {}) {
+  const current = state.billing.brokerProfile;
+  const next = { ...current };
+  PROFILE_FIELDS.forEach((k) => { if (patch[k] !== undefined) next[k] = String(patch[k] ?? "").trim(); });
+  const errors = validateBrokerProfile(next);
+  if (Object.keys(errors).length) return { errors };
+  const changed = PROFILE_FIELDS.filter((k) => current[k] !== next[k]);
+  PROFILE_FIELDS.forEach((k) => { current[k] = next[k]; });
+  if (changed.length) {
+    current.history = current.history || [];
+    current.history.push({ at: todayISO(), actor: actor(), action: "Profile updated", notes: changed.join(", ") });
+  }
+  publish({ action: "broker-profile" });
+  return { profile: current };
 }
 
 /* ---- the broker's bank accounts ---------------------------------------------------------- */

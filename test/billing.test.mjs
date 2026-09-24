@@ -204,7 +204,7 @@ test("cancellation is a reversing credit note under four-eyes; the original is c
   assert.ok(rev.documents.slice(1).every((d) => d.total < 0), "closing slips reversed too");
 });
 
-import { collectionAccountFor, validateBrokerAccount } from "../src/js/domain/billing.js";
+import { collectionAccountFor, validateBrokerAccount, invoiceTable, validateBrokerProfile } from "../src/js/domain/billing.js";
 import { documentHtml } from "../src/js/ui/print-document.js";
 
 test("broker bank accounts: validation, one primary per currency, collection by currency", () => {
@@ -248,4 +248,50 @@ test("an issued invoice keeps the pay-to account it was issued with", () => {
   assert.ok(billing.submitBatch(b2.ref), "a missing collection account warns but does not block");
   seat("ml"); billing.issueBatch(b2.ref); seat("vr");
   assert.match(documentHtml(b2, b2.documents[0]), /No collection account in USD/);
+});
+
+test("invoice table: taxes move into the Tax column of the line they are levied on, and Amount due equals the total", () => {
+  const rules = [
+    { id: "v", name: "VAT", rate: 11, basis: "Net premium", bearer: "Cedant", appliesTo: "Both", jurisdictionOf: "Cedant country", country: "", active: true },
+    { id: "s", name: "Stamp", rate: 0.1, basis: "Gross premium", bearer: "Cedant", appliesTo: "Both", jurisdictionOf: "Cedant country", country: "", active: true },
+    { id: "b", name: "Brokerage levy", rate: 1, basis: "Brokerage", bearer: "Cedant", appliesTo: "Both", jurisdictionOf: "Cedant country", country: "", active: true },
+    { id: "w", name: "WHT", rate: 2, basis: "Net premium", bearer: "Reinsurer", appliesTo: "Both", jurisdictionOf: "Reinsurer country", country: "", active: true },
+  ];
+  for (const gross of [1000000, -250000]) {
+    const r = computeBilling({ sourceKind: "bind", gross, commissionPct: 20, brokeragePct: 10, panel: [{ reinsurer: "A", weight: 0.6 }, { reinsurer: "B", weight: 0.4 }], taxRules: rules });
+    const t = invoiceTable(r.cedant.lines);
+    assert.equal(t.amountDue, r.cedant.total, `cedant amount due for ${gross}`);
+    assert.equal(t.subtotal, r.cedant.lines.filter((l) => !l.ruleId).reduce((s, l) => s + l.cents, 0));
+    assert.ok(!t.rows.some((row) => row.kind === "tax" && row.description.startsWith("VAT")), "rule taxes are not rows of their own");
+    assert.ok(t.rows.some((row) => row.kind === "tax-row" && row.description === "Brokerage levy"), "tax on brokerage gets its own row");
+    r.slips.forEach((slip) => assert.equal(invoiceTable(slip.lines).amountDue, slip.total, "closing slip amount due"));
+    if (gross > 0) {
+      const premium = t.rows.find((row) => row.kind === "premium");
+      assert.equal(premium.tax, 110000_00 + 1000_00, "11% of the premium plus 0.1% stamp");
+      assert.equal(t.rows.find((row) => row.kind === "commission").tax, -22000_00);
+      assert.equal(t.discount, 0, "no discount line, so none is shown");
+    }
+  }
+});
+
+test("broker profile: legal name required, printed as From, frozen onto issued documents", () => {
+  assert.ok(validateBrokerProfile({ legalName: "" }).legalName);
+  assert.ok(validateBrokerProfile({ legalName: "X", email: "nope" }).email);
+  assert.ok(billing.updateBrokerProfile({ legalName: "" }).errors.legalName);
+  billing.updateBrokerProfile({ address: "Jl. Sudirman Kav. 52", postalCode: "12190", country: "Indonesia", email: "finance@mbrb.co.id" });
+  assert.equal(state.billing.brokerProfile.postalCode, "12190");
+  const id = boundPlacement();
+  const [batch] = billing.batchesForSource("bind", id);
+  billing.updateBatchTerms(batch.ref, { commissionPct: 20, brokeragePct: 10 });
+  billing.submitBatch(batch.ref); seat("ml"); billing.issueBatch(batch.ref); seat("vr");
+  const invoice = batch.documents[0];
+  assert.equal(invoice.from.postalCode, "12190");
+  assert.equal(invoice.billTo.legalName, "Meridian Mutual Insurance");
+  billing.updateBrokerProfile({ postalCode: "10110" });
+  assert.equal(invoice.from.postalCode, "12190", "issued document keeps its details");
+  const html = documentHtml(batch, invoice);
+  const order = ["<h1>Invoice</h1>", "Invoice number", "Date issued", "Date due", ">From<", "Jl. Sudirman Kav. 52", "12190", "finance@mbrb.co.id", ">Bill to<", "<th>Description</th>", ">Tax<", ">Amount<", ">Total<", "Subtotal", "VAT / Tax", "Amount due"];
+  let at = -1;
+  order.forEach((needle) => { const i = html.indexOf(needle, at + 1); assert.ok(i > at, `"${needle}" in order`); at = i; });
+  assert.ok(!html.includes(">Discount<"), "discount row hidden when there is none");
 });

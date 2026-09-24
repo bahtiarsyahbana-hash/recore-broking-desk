@@ -189,7 +189,15 @@ debit note at issue, so editing an account later never changes a document
 already sent; no other currency's account is ever substituted. A missing
 collection account shows on the checklist as a warning, not a block.
 Documents print through a hidden frame to the browser's print dialog
-(`ui/print-document.js`). Invoices raised by the earlier
+(`ui/print-document.js`) in one plain layout: the document title top left
+and the broker's mark and name top right; number, issue and due dates, the
+broker's legal name, address, postal code and email on the left and the
+recipient in the same shape on the right; a Description / Tax / Amount /
+Total table (`invoiceTable` moves each configured tax into the Tax column of
+the line it is levied on); then Subtotal, Discount when there is one,
+VAT / Tax and Amount due. The broker's details come from
+`state.billing.brokerProfile` (Finance → Broker Profile) and, like the
+recipient's registry details, are copied onto the document at issue. Invoices raised by the earlier
 desk directly to reinsurers (`state.financeDocs`) stay readable as Legacy;
 `finance.service.js` is no longer called.
 

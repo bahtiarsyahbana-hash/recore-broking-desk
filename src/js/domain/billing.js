@@ -19,6 +19,7 @@
  */
 import { isValidPaymentWarranty } from "./intake.js";
 import { validateBankAccount } from "./counterparty-profile.js";
+import { isValidEmail } from "./counterparty.js";
 
 export const BATCH_STATUSES = ["Draft", "Pending Approval", "Issued", "Cancelled"];
 export const DOC_TYPES = ["Invoice", "Debit Note", "Credit Note", "Closing Slip"];
@@ -58,6 +59,20 @@ export function taxRuleApplies(rule, { sourceKind, cedantCountry, reinsurerCount
   const have = String(rule.jurisdictionOf === "Reinsurer country" ? reinsurerCountry : cedantCountry || "").trim().toLowerCase();
   return have === want;
 }
+
+/* ---- the broker's company profile ------------------------------------------ */
+
+/** Legal name is required; email must be well formed when given. */
+export function validateBrokerProfile(p = {}) {
+  const errors = {};
+  if (!String(p.legalName || "").trim()) errors.legalName = "Enter the broker's legal name as it appears on documents.";
+  if (p.email && !isValidEmail(p.email)) errors.email = "Enter a valid email address.";
+  if (p.postalCode && !/^[A-Za-z0-9 -]{3,10}$/.test(String(p.postalCode).trim())) errors.postalCode = "Postal code is 3–10 letters or digits.";
+  return errors;
+}
+
+/** What the profile still lacks for a complete document header. */
+export const brokerProfileGaps = (p = {}) => ["address", "postalCode", "email"].filter((k) => !String(p[k] || "").trim());
 
 /* ---- the broker's own bank accounts --------------------------------------- */
 
@@ -177,7 +192,7 @@ export function computeBilling({ sourceKind, gross, commissionPct, commissionAmo
     ...(C ? [{ kind: "commission", label: commissionAmount != null ? "Less commission" : `Less commission (${Number(commissionPct)}%)`, cents: -C }] : []),
     ...(L ? [{ kind: "claims", label: "Less claims", cents: -L }] : []),
     ...(T ? [{ kind: "tax", label: "Less tax in account", cents: -T }] : []),
-    ...cedantTaxes.map((t) => ({ kind: "tax", label: `${t.label} (${t.rate}% of ${t.basis.toLowerCase()})`, cents: t.cents, ruleId: t.ruleId })),
+    ...cedantTaxes.map((t) => ({ kind: "tax", label: `${t.label} (${t.rate}% of ${t.basis.toLowerCase()})`, cents: t.cents, ruleId: t.ruleId, taxName: t.label, rate: t.rate, basis: t.basis })),
   ];
   const cedantTotal = cedantLines.reduce((s, l) => s + l.cents, 0);
 
@@ -185,7 +200,7 @@ export function computeBilling({ sourceKind, gross, commissionPct, commissionAmo
     const g = gShares[i], c = cShares[i], b = bShares[i], l = lShares[i], t = tShares[i];
     const withheld = taxRules
       .filter((rule) => rule.bearer === "Reinsurer" && taxRuleApplies(rule, { ...baseCtx, reinsurerCountry: p.country || "" }))
-      .map((rule) => ({ kind: "tax", label: `Less ${rule.name} (${Number(rule.rate)}% of ${rule.basis.toLowerCase()})`, cents: -pctOf(basisCents(rule.basis, g, c, b), rule.rate), ruleId: rule.id }));
+      .map((rule) => ({ kind: "tax", label: `Less ${rule.name} (${Number(rule.rate)}% of ${rule.basis.toLowerCase()})`, cents: -pctOf(basisCents(rule.basis, g, c, b), rule.rate), ruleId: rule.id, taxName: rule.name, rate: Number(rule.rate), basis: rule.basis }));
     const lines = [
       { kind: "premium", label: `${sourceKind === "treaty" ? "Premium" : "Gross premium"} — ${formatShare(p.weight)} share`, cents: g },
       ...(c ? [{ kind: "commission", label: "Less commission", cents: -c }] : []),
@@ -223,6 +238,42 @@ export function cedantDocType(sourceKind, totalCents) {
   if (sourceKind === "bind") return totalCents < 0 ? "Credit Note" : "Invoice";
   if (sourceKind === "endorsement" || sourceKind === "reversal") return totalCents < 0 ? "Credit Note" : "Debit Note";
   return totalCents < 0 ? "Credit Note" : "Invoice";
+}
+
+/* ---- the printed document ------------------------------------------------------ */
+
+/**
+ * Arrange a document's lines as an invoice table: Description, Tax, Amount,
+ * Total, then Subtotal, Discount (only when there is one), VAT / tax and
+ * Amount due. Tax lines from configured rules are moved into the Tax column of
+ * the line they are levied on — gross-premium taxes on the premium line,
+ * net-premium taxes split between premium and commission — and a tax on
+ * brokerage, which is not a line on the document, gets a row of its own.
+ * Amount due always equals the document total.
+ */
+export function invoiceTable(lines = []) {
+  const isRuleTax = (l) => l.kind === "tax" && l.ruleId;
+  const rows = lines.filter((l) => !isRuleTax(l)).map((l) => ({ kind: l.kind, description: l.label, amount: l.cents, tax: 0, taxes: [] }));
+  const premium = rows.find((r) => r.kind === "premium");
+  const commission = rows.find((r) => r.kind === "commission");
+  lines.filter(isRuleTax).forEach((t) => {
+    const note = `${t.taxName || t.label} ${t.rate != null ? `${t.rate}%` : ""}`.trim();
+    if (t.basis === "Net premium" && premium && commission && premium.amount + commission.amount !== 0) {
+      // Tax on net = tax on premium less tax on commission, split in proportion.
+      const onPremium = Math.round(t.cents * premium.amount / (premium.amount + commission.amount));
+      premium.tax += onPremium; premium.taxes.push(note);
+      commission.tax += t.cents - onPremium; commission.taxes.push(note);
+    } else if ((t.basis === "Gross premium" || t.basis === "Net premium") && premium) {
+      premium.tax += t.cents; premium.taxes.push(note);
+    } else {
+      rows.push({ kind: "tax-row", description: t.taxName || t.label, amount: 0, tax: t.cents, taxes: [note] });
+    }
+  });
+  rows.forEach((r) => { r.total = r.amount + r.tax; });
+  const discount = rows.filter((r) => r.kind === "discount").reduce((s, r) => s + r.amount, 0);
+  const subtotal = rows.filter((r) => r.kind !== "discount").reduce((s, r) => s + r.amount, 0);
+  const tax = rows.reduce((s, r) => s + r.tax, 0);
+  return { rows, subtotal, discount, tax, amountDue: subtotal + discount + tax };
 }
 
 /* ---- due date ---------------------------------------------------------------- */

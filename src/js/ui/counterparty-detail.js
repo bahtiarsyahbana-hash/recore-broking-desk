@@ -55,7 +55,7 @@ function profile(c, categoryId) {
     panel: "Panel", marketForm: "Counterparty form", collateral: "Collateral held", role: "Role", status: "Status",
     commissionSplit: "Default commission split", regulator: "Home regulator", licenceNo: "Licence number",
     licenceCategory: "Licence category", ownership: "Ownership", settlementCurrency: "Settlement currency",
-    paymentTerms: "Payment terms", address: "Registered address", notes: "Notes", source: "Source",
+    paymentTerms: "Payment terms", address: "Registered address", postalCode: "Postal code", notes: "Notes", source: "Source",
   };
   const format = (k, v) => k === "kyc" ? statusPill(v === "Current" ? "Active" : v)
     : k === "status" ? statusPill(v)

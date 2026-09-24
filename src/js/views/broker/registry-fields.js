@@ -116,7 +116,9 @@ const contactSection = (sectionName = "Primary contact (PIC)") => [
   { name: "contactTitle", label: "Job title", type: "text", placeholder: "e.g. Head of Treaty", section: sectionName, half: true },
   phoneField("contactPhone", "Phone", { section: sectionName, half: true }),
   emailField("contactEmail", "Email", { section: sectionName }),
-  { name: "address", label: "Registered address", type: "textarea", rows: 2, placeholder: "Street, city, postcode", section: sectionName },
+  { name: "address", label: "Registered address", type: "textarea", rows: 2, placeholder: "Street, building, city", section: sectionName },
+  { name: "postalCode", label: "Postal code", type: "text", placeholder: "e.g. 12190", section: sectionName, half: true,
+    validate: (v) => (/^[A-Za-z0-9 -]{3,10}$/.test(v) ? null : "Postal code is 3–10 letters or digits.") },
 ];
 
 /**

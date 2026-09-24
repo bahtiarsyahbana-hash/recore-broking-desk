@@ -17,7 +17,7 @@ import {
   treatyAgreements as seedAgreements, premiumBordereaux as seedPremiumBdx, claimsBordereaux as seedClaimsBdx,
   treatyCessions as seedCessions, technicalAccounts as seedAccounts, treatySettlements as seedSettlements,
 } from "../data/treaty.data.js";
-import { PORTAL_CEDANT } from "./config.js";
+import { PORTAL_CEDANT, BROKING_FIRM } from "./config.js";
 import {
   cedants as seedCedants, markets as seedMarkets,
   brokers as seedBrokers, others as seedOthers,
@@ -76,7 +76,11 @@ export const state = {
    * Slip per reinsurer) and the custom tax and levy rules applied to them.
    * Mutated only through services/billing.service.js. Nothing is seeded.
    */
-  billing: { batches: [], taxRules: [], brokerAccounts: [] },
+  billing: {
+    batches: [], taxRules: [], brokerAccounts: [],
+    /** The broker's own details, printed on every finance document. Only the legal name is known up front. */
+    brokerProfile: { legalName: BROKING_FIRM, address: "", postalCode: "", country: "", email: "", phone: "", taxId: "", history: [] },
+  },
   treaty: {
     agreements: seedAgreements.map((a) => JSON.parse(JSON.stringify(a))),
     premiumBordereaux: seedPremiumBdx.map((b) => ({ ...b })),
