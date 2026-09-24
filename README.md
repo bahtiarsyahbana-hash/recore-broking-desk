@@ -135,12 +135,23 @@ the cedant's instruction to bind is not.
 Binding freezes the terms and issues the RI slip and binding slips, each with a
 delivery status.
 
+**Treaty Engine** administers treaty contracts already negotiated and bound
+outside Recordes. The broker registers each Treaty Agreement (a five-step
+wizard: basics, structure by type, reinsurer panel, reporting and accounting,
+documents and summary) and then manages its premium bordereaux, claims
+bordereaux, individual cessions, technical accounts, settlements, documents,
+endorsements and audit trail under it. The register offers Table, List and
+Cards with filters for cedant, class, contract period, status, treaty type,
+reinsurer and currency. An agreement activates only when its panel totals
+exactly 100%; a Closed agreement takes no new transactions; only agreements
+configured to require declarations accept individual cessions.
+
 Every **Registry** entry opens to a drawer where the desk views or manages the
 company profile, the bank accounts settlement runs through, and the people in
 charge grouped by the division they handle — placement, claims, technical
 accounting, compliance, management — with several people allowed per division.
 
-Tests: `npm test` runs the domain rules (lifecycle, panel capacity, intake, registry profile)
+Tests: `npm test` runs the domain rules (lifecycle, panel capacity, intake, registry profile, treaty administration)
 with Node's built-in test runner; there are no dependencies.
 
 The dashboard shows **concentration** alongside the totals: premium by cedant

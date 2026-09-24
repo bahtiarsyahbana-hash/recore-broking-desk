@@ -13,6 +13,10 @@ import { bordereaux as seedBordereaux } from "../data/bordereaux.data.js";
 import { claims as seedClaims } from "../data/claims.data.js";
 import { financeDocs as seedFinanceDocs } from "../data/finance.data.js";
 import { intakes as seedIntakes } from "../data/intakes.data.js";
+import {
+  treatyAgreements as seedAgreements, premiumBordereaux as seedPremiumBdx, claimsBordereaux as seedClaimsBdx,
+  treatyCessions as seedCessions, technicalAccounts as seedAccounts, treatySettlements as seedSettlements,
+} from "../data/treaty.data.js";
 import { PORTAL_CEDANT } from "./config.js";
 import {
   cedants as seedCedants, markets as seedMarkets,
@@ -63,6 +67,19 @@ export const state = {
   /** Risks the cedant portal has sent that the desk has not yet picked up. */
   pendingSubmissions: [],
   /**
+   * Treaty administration: agreements registered as master records and the
+   * operational workstreams that reference them. Mutated only through
+   * services/treaty.service.js.
+   */
+  treaty: {
+    agreements: seedAgreements.map((a) => JSON.parse(JSON.stringify(a))),
+    premiumBordereaux: seedPremiumBdx.map((b) => ({ ...b })),
+    claimsBordereaux: seedClaimsBdx.map((b) => ({ ...b })),
+    cessions: seedCessions.map((c) => ({ ...c })),
+    technicalAccounts: seedAccounts.map((t) => ({ ...t })),
+    settlements: seedSettlements.map((s) => ({ ...s })),
+  },
+  /**
    * The signed-in user, or null before sign-in. Identity is no longer a
    * dropdown: whose authority applies, and which portal opens, both follow
    * from who signed in.
@@ -91,7 +108,18 @@ export const sequences = {
   bordereau: 5,
   program: 1008,
   intake: 1003,
+  premiumBdx: 36, claimsBdx: 22, cession: 110, account: 15, settlement: 226,
 };
+export const nextTreatyRef = (kind) => ({
+  premiumBdx: () => "PB-" + String(sequences.premiumBdx++).padStart(4, "0"),
+  claimsBdx: () => "CB-" + String(sequences.claimsBdx++).padStart(4, "0"),
+  cession: () => "DC-" + String(sequences.cession++).padStart(4, "0"),
+  account: () => "TAC-2026-" + String(sequences.account++).padStart(3, "0"),
+  settlement: () => "ST-" + String(sequences.settlement++).padStart(4, "0"),
+}[kind]());
+
+/** A treaty agreement by its agreement number. */
+export const agreementById = (id) => state.treaty.agreements.find((a) => a.id === id);
 
 export const nextInvoiceNo = () => "INV-" + sequences.invoice++;
 export const nextCreditNoteNo = () => "CN-" + String(sequences.creditNote++).padStart(4, "0");

@@ -1,0 +1,44 @@
+/* Treaty Engine — agreement register (table, list, cards), the registration
+   wizard's layer and panel grids, and the agreement drawer's tab strip. */
+.tcards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+.tcard{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; cursor:pointer; box-shadow:var(--shadow); transition:border-color .15s; }
+.tcard:hover, .tcard:focus-visible{ border-color:var(--marine); outline:none; }
+.tcard-top{ display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; }
+.tcard-title{ font-weight:600; font-size:13.5px; margin-top:6px; color:var(--ink); }
+.tcard-meta{ font-size:11.5px; color:var(--ink-soft); margin-top:3px; }
+.tcard-foot{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.tcard .mono{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; }
+
+.tfilters{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+.tfilters select, .tfilters input[type=search]{ padding:6px 9px; font-size:12.5px; max-width:200px; }
+.tfilters .reset{ font-size:12px; }
+
+.layer-grid{ display:grid; grid-template-columns:1.2fr 1.2fr .8fr 1fr auto; gap:8px; align-items:end; margin-bottom:6px; }
+.layer-grid .field{ margin-bottom:0; }
+.layer-grid .layer-note{ grid-column:1 / -1; font-size:11px; color:var(--ink-soft); min-height:14px; margin-bottom:6px; }
+.layer-grid .layer-note .field-error{ margin:0; }
+.panel-grid{ display:grid; grid-template-columns:1.8fr .8fr .8fr .8fr 1.2fr auto; gap:8px; align-items:end; margin-bottom:8px; }
+.panel-grid .field{ margin-bottom:0; }
+.panel-grid .panel-err{ grid-column:1 / -1; margin:0 0 4px; }
+.doc-checks{ display:flex; gap:14px; flex-wrap:wrap; }
+.doc-check{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; }
+
+/* Drawer tabs: scrollable strip, since ten tabs will not fit a phone. */
+.dtabs{ display:flex; gap:2px; border-bottom:1px solid var(--line); margin:0 0 16px; overflow-x:auto; scrollbar-width:none; }
+.dtabs::-webkit-scrollbar{ display:none; }
+.dtab{ flex:none; padding:8px 10px; font-size:12.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; border:none; background:none; border-bottom:2px solid transparent; }
+.dtab.active{ color:var(--marine-ink); border-color:var(--marine); }
+.dtab .kcol-count{ margin-left:4px; }
+.ovw-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:14px; }
+.ovw{ background:var(--surface-2); border-radius:8px; padding:10px 12px; }
+.ovw-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
+.ovw-value{ font-size:14px; font-weight:600; margin-top:3px; }
+.ovw-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+.wrow-actions{ display:flex; gap:6px; align-items:center; }
+.wrow-actions select{ padding:3px 6px; font-size:11.5px; }
+
+@media (max-width:860px){
+  .layer-grid, .panel-grid{ grid-template-columns:1fr 1fr; }
+  .layer-grid button, .panel-grid button{ grid-column:1 / -1; justify-self:end; }
+  .tfilters select, .tfilters input[type=search]{ max-width:none; flex:1 1 45%; }
+}

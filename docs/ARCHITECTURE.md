@@ -92,6 +92,17 @@ where the business is, and it is the layer worth unit-testing first.
   placement so the intake stays immutable. New placements are Quota Share or
   Excess of Loss only (`PLACEMENT_TYPES`); payment warranty is one of 15, 30,
   45, 60 or 90 days (`PAYMENT_WARRANTY_DAYS`).
+- `treaty.js` — treaty administration. Agreements negotiated and bound outside
+  Recordes are registered as master records (five types: Quota Share, Surplus,
+  Per Risk XoL, Catastrophe XoL, Stop Loss; statuses Draft Setup → Active →
+  Expiring / Run-off → Closed, moved only by explicit action). Per-type
+  structure validation (every XoL layer checked on its own; stop-loss ratios
+  ordered), panel rules (exactly 100% signed before activation),
+  `activationChecklist` / `canActivate`, the expiry indicator, and validation
+  for every workstream record — premium bordereau, claims bordereau, individual
+  cession (only where the agreement requires declarations), technical account,
+  settlement — each of which must reference an agreement that is not Closed.
+  Calculations reuse `quota-share.js`, `surplus.js` and `xol.js`.
 - `portfolio.js` — book-level analytics: totals, premium by class, loss ratios,
   renewals due, and **concentration** — premium by cedant, exposure by
   reinsurer, and `concentration()`, which ranks any `{name: amount}` map into
@@ -139,6 +150,15 @@ Nothing simulates a counterparty: a market's response is what a broker recorded.
 freezes the agreed terms in `boundTerms`, issues an RI Slip to the cedant and a
 Binding Slip to each reinsurer (type, version, recipient, issue date, issuer,
 delivery status), then raises the market invoice as before.
+
+`treaty.service.js` is the only writer to `state.treaty`: `registerAgreement`
+(unique agreement number; saved as Draft Setup, or activated when every gate
+holds), `updateAgreement`, `activateAgreement`, `setAgreementStatus`,
+documents and endorsements, the five workstream writers and `setRecordStatus`.
+Every write appends to the agreement's audit trail. Treaty Engine does not
+pass through Placement; `origin` is a nullable reference kept for future
+integration. The former calculator page lives on as `ui/treaty-calculators.js`,
+embedded under an agreement's Structure tab and prefilled from its terms.
 
 `intake.service.js` owns the broker intake queue. `createManualIntake` records
 a request that arrived by email, phone, WhatsApp or meeting; `createPortalIntake`

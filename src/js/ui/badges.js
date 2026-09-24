@@ -26,6 +26,9 @@ const TONE = {
   // Intake queue.
   "Received": "info", "Accepted": "good", "Revision Requested": "warn",
   "Converted to Placement": "good",
+  // Treaty administration.
+  "Draft Setup": "neutral", "Expiring": "warn", "Run-off": "info", "Closed": "neutral",
+  "Posted": "good", "Declared": "info", "Pending": "warn", "Part paid": "warn", "Settled": "good",
   // Document delivery.
   "Issued": "info", "Delivered": "good", "Acknowledged": "good", "Filed": "neutral",
   // A counterparty nobody has onboarded is neither fine nor failing.

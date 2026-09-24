@@ -25,6 +25,7 @@ export const TOPICS = {
   FINANCE: "finance:changed",
   SUBMISSIONS: "submissions:changed",
   INTAKES: "intakes:changed",
+  TREATY: "treaty:changed",
   REGISTRY: "registry:changed",
   ROLE: "role:changed",
   SEAT: "seat:changed",
